@@ -6,3 +6,4 @@ checkpoints
 /notebooks
 test.py
 test
+*.json
