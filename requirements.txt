@@ -1,0 +1,8 @@
+torch
+torchvision 
+transformers 
+datasets 
+accelerate
+numpy
+tokenizers
+hf_xet
