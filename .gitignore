@@ -1,9 +1,10 @@
 __pycache__
 .venv
-checkpoints
+checkpoints/
 .env
 /*.pt
-/notebooks
 test.py
 test
 *.json
+notebooks/
+*.ipynb

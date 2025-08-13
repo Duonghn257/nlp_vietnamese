@@ -5,5 +5,5 @@ __all__ = [
     "prepare_vietnamese_dataset",
     "VietnameseTextDataset",
     "VietnamesePreprocessor",
-    "VietnameseTokenizer"
+    "VietnameseTokenizer",
 ]
