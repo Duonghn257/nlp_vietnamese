@@ -15,8 +15,8 @@ import matplotlib.pyplot as plt
 # Import your modules (make sure these files are in the same directory)
 from src.tokenizer import VietnamesePreprocessor, VietnameseTokenizer
 from src.dataset import prepare_vietnamese_dataset
-from train import VietnameseTransformer, VietnameseTrainer
-
+from src.trainer import VietnameseTrainer
+from src.model import VietnameseTransformer
 
 def setup_training_config():
     """Setup training configuration"""
