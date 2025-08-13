@@ -219,8 +219,7 @@ def save_model_and_config(model, tokenizer, config, model_path, config_path):
                 "d_ff": config["d_ff"],
                 "max_seq_len": config["max_seq_len"],
                 "dropout": config["dropout"],
-            },
-            "tokenizer_file": config["tokenizer_file"],
+            }
         },
         model_path,
     )
