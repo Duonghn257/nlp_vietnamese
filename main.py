@@ -37,7 +37,7 @@ def setup_training_config():
     """Setup training configuration"""
     config = {
         # Data configuration
-        "data_folder": "train_data_1",
+        "data_folder": "data1",
         "tokenizer_file": "vietnamese_tokenizer.json",
         "vocab_size": 25000,
         "max_seq_len": 512,
@@ -369,5 +369,5 @@ if __name__ == "__main__":
     config["device"] = args.device
 
     # Run training
-    # main()
+    main()
     test(test_cases=["thơ lục bát: mùa đông để mộng nằm im "], max_new_tokens=150)
