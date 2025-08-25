@@ -18,6 +18,7 @@ from src.dataset import prepare_vietnamese_dataset
 from src.trainer import VietnameseTrainer
 from src.model import VietnameseTransformer
 
+
 def setup_training_config():
     """Setup training configuration"""
     config = {
