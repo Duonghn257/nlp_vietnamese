@@ -3,48 +3,63 @@
 Complete training script for Vietnamese Text Generation using Decoder-Only Transformer
 Usage: python train_vietnamese_transformer.py
 """
+import os
 
+from torch.utils.data.datapipes import datapipe
+from src import (
+    VietnameseTrainer,
+    VietnamesePreprocessor,
+    VietnameseTextDataset,
+    VietnameseTokenizer,
+    VietnameseTransformer,
+    prepare_vietnamese_dataset,
+    test_generation,
+    load_texts_from_folder,
+)
+
+from tokenizers import Tokenizer
+from tokenizers.models import BPE
+from tokenizers.trainers import BpeTrainer
+from tokenizers.pre_tokenizers import Whitespace, Punctuation, Sequence
+from tokenizers.normalizers import NFD, Sequence as NormalizerSequence
+
+from typing import List, Dict
 import torch
 import torch.nn as nn
-import os
-import argparse
-import json
-from pathlib import Path
+from glob import glob
 import matplotlib.pyplot as plt
-
-# Import your modules (make sure these files are in the same directory)
-from src.tokenizer import VietnamesePreprocessor, VietnameseTokenizer
-from src.dataset import prepare_vietnamese_dataset
-from train import VietnameseTransformer, VietnameseTrainer
+import json
+import argparse
+import random
 
 
 def setup_training_config():
     """Setup training configuration"""
     config = {
         # Data configuration
-        "data_file": "truyen_kieu.txt",
+        "data_folder": "train_data_1",
         "tokenizer_file": "vietnamese_tokenizer.json",
-        "vocab_size": 5000,
-        "max_seq_len": 128,
+        "vocab_size": 25000,
+        "max_seq_len": 512,
         "train_split": 0.8,
         # Model configuration
-        "d_model": 512,
-        "n_heads": 8,
-        "n_layers": 6,
-        "d_ff": 2048,
+        "d_model": 768,
+        "n_heads": 12,
+        "n_layers": 12,
+        "d_ff": 3072,
         "dropout": 0.1,
         # Training configuration
         "batch_size": 16,
-        "learning_rate": 1e-4,
+        "learning_rate": 3e-5,
         "weight_decay": 0.01,
-        "num_epochs": 50,
-        "warmup_steps": 1000,
+        "num_epochs": 10,
+        "warmup_steps": 5000,
         "device": "auto",  # 'cuda', 'cpu', or 'auto'
         # Generation configuration
         "temperature": 0.8,
-        "top_k": 50,
+        "top_k": 10,
         "top_p": 0.9,
-        "max_new_tokens": 50,
+        "max_new_tokens": 512,
         # Save configuration
         "model_save_path": "vietnamese_transformer_best.pt",
         "config_save_path": "training_config.json",
@@ -52,60 +67,36 @@ def setup_training_config():
     return config
 
 
-def create_sample_data(file_path: str):
-    """Create sample Vietnamese literature data if file doesn't exist"""
-    sample_data = (
-        """
-    Trăm năm trong cõi người ta,
-    Chữ tài chữ mệnh khéo là ghét nhau.
-    Trải qua một cuộc bể dâu,
-    Những điều trông thấy mà đau đớn lòng.
-    Lạ gì bỉ sắc tư phong,
-    Trời xanh quen thói má hồng đánh ghen.
-    Cũng đành rằng số kiếp en,
-    Vì chưng nàng sắc nên thêm nàng tài.
+def build_tokenizer(data_path: str, save_path: str, vocab_size: int):
+    vn_tokenizer = VietnameseTokenizer()
+    trainer = vn_tokenizer.build_tokenizer(vocab_size=vocab_size, min_frequency=2)
 
-    Truyện Kiều được viết bởi Nguyễn Du vào thế kỷ XIX.
-    Tác phẩm này được coi là kiệt tác của văn học Việt Nam.
-    Câu chuyện kể về số phận của Thúy Kiều, một cô gái tài sắc vượt trội.
-    Qua nhiều thăng trầm trong cuộc đời, cuối cùng nàng được đoàn tụ với gia đình.
+    # Get training files
+    train_files = glob(os.path.join(data_path, "*.txt"))
 
-    Văn học Việt Nam có nhiều tác phẩm nổi tiếng khác.
-    Số Đỏ của Vũ Trọng Phụng là một tiểu thuyết hiện thực xuất sắc.
-    Kim Lân nổi tiếng với những truyện ngắn về cuộc sống nông thôn.
-    Nguyễn Tuân được biết đến với văn xuôi miêu tả thiên nhiên tuyệt đẹp.
+    if not train_files:
+        print(f"No training files found in {data_path}")
+        print(f"Please add Vietnamese text files (.txt) to {data_path} directory")
+        return
 
-    Thơ ca cổ điển Việt Nam thường sử dụng thể lục bát, thất ngôn tứ tuyệt.
-    Truyền thống văn học dân gian rất phong phú với các câu chuyện cổ tích.
-    Tấm Cám, Thạch Sanh, Sơn Tinh Thủy Tinh là những truyện nổi tiếng.
-    Các câu ca dao, tục ngữ cũng thể hiện triết lý sống sâu sắc.
+    print(f"Found {len(train_files)} training files")
 
-    Hồ Chí Minh cũng có những bài thơ nổi tiếng viết trong tù.
-    Nhật ký trong tù thể hiện tinh thần kiên cường của người cộng sản.
-    Văn học hiện đại Việt Nam phát triển mạnh mẽ từ đầu thế kỷ XX.
-    Nhiều tác giả trẻ đã góp phần làm giàu kho tàng văn học dân tộc.
+    # Train the tokenizer
+    print("Training tokenizer...")
+    vn_tokenizer.train(train_files, trainer)
 
-    Ngôn ngữ Việt Nam có đặc điểm là đơn âm tiết và có thanh điệu.
-    Mỗi tiếng có thể mang nhiều nghĩa khác nhau tùy theo thanh điệu.
-    Điều này tạo nên sự phong phú và đa dạng trong cách diễn đạt.
-    Văn học Việt Nam khai thác triệt để vẻ đẹp của ngôn ngữ này.
+    # Setup post-processor
+    vn_tokenizer.setup_post_processor()
 
-    Truyện Kiều không chỉ là tác phẩm văn học mà còn là bức tranh xã hội.
-    Nó phản ánh những mâu thuẫn sâu sắc của xã hội phong kiến.
-    Số phận con người bị chi phối bởi hoàn cảnh xã hội.
-    Tình yêu và lòng hiếu thảo là những giá trị được tôn vinh.
+    # Save tokenizer
+    vn_tokenizer.save(save_path)
+    print(f"Tokenizer saved as {save_path}")
 
-    Ngày nay, văn học Việt Nam tiếp tục phát triển với nhiều hình thức mới.
-    Tiểu thuyết, truyện ngắn, thơ, kịch đều có những tác phẩm xuất sắc.
-    Các nhà văn trẻ mang đến làn gió mới cho nền văn học.
-    Văn học Việt Nam ngày càng được quốc tế quan tâm và đánh giá cao.
-    """
-        * 3
-    )  # Repeat to have more training data
 
-    with open(file_path, "w", encoding="utf-8") as f:
-        f.write(sample_data)
-    print(f"✅ Created sample data file: {file_path}")
+def load_tokenizer(tokenizer_path: str) -> VietnameseTokenizer:
+    tokenizer = VietnameseTokenizer()
+    tokenizer.load(tokenizer_path)
+    return tokenizer
 
 
 def plot_training_history(train_losses, val_losses, save_path="training_history.png"):
@@ -139,100 +130,6 @@ def plot_training_history(train_losses, val_losses, save_path="training_history.
     print(f"📊 Training history saved to: {save_path}")
 
 
-def test_generation(model, tokenizer, device, test_cases=None):
-    """Test text generation with various examples"""
-    if test_cases is None:
-        test_cases = [
-            "Truyện Kiều được viết",
-            "Văn học Việt Nam",
-            "Nguyễn Du là",
-            "Thúy Kiều",
-            "Tác phẩm này",
-        ]
-
-    print("\n" + "=" * 60)
-    print("🎯 TESTING TEXT GENERATION")
-    print("=" * 60)
-
-    model.eval()
-
-    for i, prompt in enumerate(test_cases, 1):
-        print(f"\n--- Test {i} ---")
-        print(f"Input: '{prompt}'")
-
-        # Encode input
-        input_ids = torch.tensor(
-            [tokenizer.encode(prompt, add_special_tokens=False).ids], device=device
-        )
-
-        # Generate with different settings
-        generation_configs = [
-            {
-                "temperature": 0.7,
-                "top_k": 50,
-                "top_p": 0.9,
-                "max_new_tokens": 15,
-                "name": "Balanced",
-            },
-            {
-                "temperature": 1.0,
-                "top_k": 20,
-                "top_p": 0.8,
-                "max_new_tokens": 15,
-                "name": "Creative",
-            },
-            {
-                "temperature": 0.3,
-                "top_k": 10,
-                "top_p": 1.0,
-                "max_new_tokens": 15,
-                "name": "Conservative",
-            },
-        ]
-
-        for config in generation_configs:
-            with torch.no_grad():
-                generated = model.generate(
-                    input_ids,
-                    temperature=config["temperature"],
-                    top_k=config["top_k"],
-                    top_p=config["top_p"],
-                    max_new_tokens=config["max_new_tokens"],
-                    do_sample=True,
-                )
-
-            generated_text = tokenizer.decode(generated[0].cpu().tolist())
-            print(f"  {config['name']}: '{generated_text}'")
-
-
-def save_model_and_config(model, tokenizer, config, model_path, config_path):
-    """Save the trained model and configuration"""
-    # Save model state
-    torch.save(
-        {
-            "model_state_dict": model.state_dict(),
-            "model_config": {
-                "vocab_size": config["vocab_size"],
-                "d_model": config["d_model"],
-                "n_heads": config["n_heads"],
-                "n_layers": config["n_layers"],
-                "d_ff": config["d_ff"],
-                "max_seq_len": config["max_seq_len"],
-                "dropout": config["dropout"],
-            },
-            "tokenizer_file": config["tokenizer_file"],
-        },
-        model_path,
-    )
-
-    # Save configuration
-    with open(config_path, "w", encoding="utf-8") as f:
-        json.dump(config, f, indent=2, ensure_ascii=False)
-
-    print(f"💾 Model saved to: {model_path}")
-    print(f"⚙️  Configuration saved to: {config_path}")
-
-
 def load_model_and_tokenizer(model_path, tokenizer_path):
     """Load trained model and tokenizer"""
     # Load model checkpoint
@@ -261,47 +158,50 @@ def main():
     # Load configuration
     config = setup_training_config()
 
-    # Create data file if it doesn't exist
-    if not os.path.exists(config["data_file"]):
-        print(f"⚠️  Data file not found: {config['data_file']}")
-        print("Creating sample data...")
-        create_sample_data(config["data_file"])
-
-    print(f"📊 Training Configuration:")
-    for key, value in config.items():
-        print(f"  {key}: {value}")
-
     # Step 1: Prepare dataset
     print(f"\n{'='*20} STEP 1: DATA PREPARATION {'='*20}")
 
-    train_loader, val_loader, tokenizer = prepare_vietnamese_dataset(
-        data_file=config["data_file"],
-        tokenizer_file=config["tokenizer_file"],
-        vocab_size=config["vocab_size"],
+    vietnam_tokenizer: VietnameseTransformer = None
+    vietnam_tokenizer = load_tokenizer(config["tokenizer_file"])
+    if vietnam_tokenizer == None:
+        build_tokenizer(
+            data_path=config["data_folder"],
+            save_path=config["tokenizer_file"],
+            vocab_size=config["vocab_size"],
+        )
+
+        print(f"📊 Training Configuration:")
+        for key, value in config.items():
+            print(f"  {key}: {value}")
+
+        vietnam_tokenizer = load_tokenizer(config["tokenizer_file"])
+
+    tokenizer = vietnam_tokenizer.tokenizer
+    train_loader, val_loader = prepare_vietnamese_dataset(
+        data_folder=config["data_folder"],
+        tokenizer=tokenizer,
         max_length=config["max_seq_len"],
-        train_split=config["train_split"],
-        batch_size=config["batch_size"],
     )
 
     print(f"✅ Dataset prepared successfully!")
     print(f"   Training batches: {len(train_loader)}")
     print(f"   Validation batches: {len(val_loader)}")
-    print(f"   Vocabulary size: {len(tokenizer.vocab)}")
+    print(f"   Vocabulary size: {tokenizer.get_vocab_size()}")
 
     # Step 2: Create model
     print(f"\n{'='*20} STEP 2: MODEL CREATION {'='*20}")
 
     model = VietnameseTransformer(
-        vocab_size=len(tokenizer.vocab),
+        vocab_size=tokenizer.get_vocab_size(),
         d_model=config["d_model"],
         n_heads=config["n_heads"],
         n_layers=config["n_layers"],
         d_ff=config["d_ff"],
         max_seq_len=config["max_seq_len"],
         dropout=config["dropout"],
-        pad_token_id=tokenizer.word_to_id[tokenizer.PAD_TOKEN],
+        pad_token_id=tokenizer.token_to_id("[PAD]"),
     )
-
+    # exit()
     total_params = sum(p.numel() for p in model.parameters())
     trainable_params = sum(p.numel() for p in model.parameters() if p.requires_grad)
 
@@ -332,7 +232,13 @@ def main():
     # Test initial generation (before training)
     print(f"\n{'='*20} INITIAL GENERATION TEST {'='*20}")
     print("Testing generation before training (should be random):")
-    test_generation(model, tokenizer, trainer.device, ["Truyện Kiều được viết"])
+    test_generation(
+        model,
+        tokenizer,
+        trainer.device,
+        ["thơ lục bát: ai ơi xa bến quê hương "],
+        max_new_tokens=20,
+    )
 
     # Step 4: Train the model
     print(f"\n{'='*20} STEP 4: TRAINING {'='*20}")
@@ -355,7 +261,6 @@ def main():
                 "optimizer_state_dict": trainer.optimizer.state_dict(),
                 "train_losses": trainer.train_losses,
                 "val_losses": trainer.val_losses,
-                "tokenizer": tokenizer,
             },
             "vietnamese_transformer_interrupted.pt",
         )
@@ -381,40 +286,45 @@ def main():
         print("✅ Loaded best model for testing")
 
     # Test with multiple examples
-    test_generation(model, tokenizer, trainer.device)
-
-    # Step 7: Save final configuration
-    save_model_and_config(
-        model, tokenizer, config, config["model_save_path"], config["config_save_path"]
+    test_generation(
+        model, tokenizer, trainer.device, ["thơ lục bát: ai ơi xa bến quê hương"]
     )
 
-    print(f"\n{'='*20} TRAINING COMPLETE {'='*20}")
-    print("🎯 Your Vietnamese text generation model is ready!")
-    print(f"📁 Model saved: {config['model_save_path']}")
-    print(f"📁 Tokenizer: {config['tokenizer_file']}")
-    print(f"📁 Config: {config['config_save_path']}")
 
-    # Example usage instructions
-    print(f"\n{'='*20} USAGE EXAMPLE {'='*20}")
-    print("To use your trained model:")
-    print("```python")
-    print("# Load model and tokenizer")
-    print(f"model, tokenizer = load_model_and_tokenizer(")
-    print(f"    '{config['model_save_path']}', '{config['tokenizer_file']}')")
-    print("")
-    print("# Generate text")
-    print("device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')")
-    print("model.to(device)")
-    print("model.eval()")
-    print("")
-    print("prompt = 'Truyện Kiều được viết'")
-    print(
-        "input_ids = torch.tensor([tokenizer.encode(prompt, add_special_tokens=False)], device=device)"
+def test(test_cases: list[str], max_new_tokens: int):
+    config = setup_training_config()
+    vietnam_tokenizer = load_tokenizer(config["tokenizer_file"])
+    tokenizer = vietnam_tokenizer.tokenizer
+    model = VietnameseTransformer(
+        vocab_size=tokenizer.get_vocab_size(),
+        d_model=config["d_model"],
+        n_heads=config["n_heads"],
+        n_layers=config["n_layers"],
+        d_ff=config["d_ff"],
+        max_seq_len=config["max_seq_len"],
+        dropout=config["dropout"],
+        pad_token_id=tokenizer.token_to_id("[PAD]"),
     )
-    print("generated = model.generate(input_ids, max_new_tokens=20, temperature=0.8)")
-    print("result = tokenizer.decode(generated[0].cpu().tolist())")
-    print("print(result)")
-    print("```")
+
+    # Step 6: Final generation test
+    print(f"\n{'='*20} STEP 6: FINAL GENERATION TEST {'='*20}")
+    print(config["model_save_path"])
+    # Load best model for testing
+    if os.path.exists(config["model_save_path"]):
+        checkpoint = torch.load(
+            "vietnamese_transformer_interrupted.pt",
+            map_location="cpu",
+            weights_only=False,
+        )
+        model.load_state_dict(checkpoint["model_state_dict"])
+        print("✅ Loaded best model for testing")
+    test_generation(
+        model,
+        tokenizer,
+        device="cpu",
+        test_cases=test_cases,
+        max_new_tokens=max_new_tokens,
+    )
 
 
 if __name__ == "__main__":
@@ -423,13 +333,13 @@ if __name__ == "__main__":
         description="Train Vietnamese Text Generation Model"
     )
     parser.add_argument(
-        "--data_file",
+        "--data_folder",
         type=str,
-        default="data/truyen_kieu.txt",
+        default="./data",
         help="Path to the Vietnamese text data file",
     )
     parser.add_argument(
-        "--vocab_size", type=int, default=5000, help="Vocabulary size for tokenizer"
+        "--vocab_size", type=int, default=20000, help="Vocabulary size for tokenizer"
     )
     parser.add_argument(
         "--batch_size", type=int, default=16, help="Training batch size"
@@ -450,7 +360,8 @@ if __name__ == "__main__":
 
     # Update config with command line arguments
     config = setup_training_config()
-    config["data_file"] = args.data_file
+    config["data_folder"] = args.data_folder
+    # config["data_file"] = args.data_file
     config["vocab_size"] = args.vocab_size
     config["batch_size"] = args.batch_size
     config["num_epochs"] = args.epochs
@@ -458,4 +369,5 @@ if __name__ == "__main__":
     config["device"] = args.device
 
     # Run training
-    main()
+    # main()
+    test(test_cases=["thơ lục bát: mùa đông để mộng nằm im "], max_new_tokens=150)

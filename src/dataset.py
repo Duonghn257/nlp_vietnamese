@@ -69,49 +69,6 @@ class VietnameseTextDataset(Dataset):
         print(f"Created {len(all_sequences)} training sequences")
         return all_sequences
 
-    # def _create_sequences(self, texts: List[str]) -> List[List[int]]:
-    #     """Create training sequences from texts, adding EOS token"""
-    #     all_sequences = []
-
-    #     # Add EOS and PAD tokens to the tokenizer if they don't exist
-    #     # This is a good practice to ensure consistency
-    #     if "[EOS]" not in self.tokenizer.get_vocab():
-    #         self.tokenizer.add_special_tokens(["[EOS]"])
-    #     if "[PAD]" not in self.tokenizer.get_vocab():
-    #         self.tokenizer.add_special_tokens(["[PAD]"])
-
-    #     # Get pad and eos token IDs
-    #     pad_id = self.tokenizer.token_to_id("[PAD]")
-    #     eos_id = self.tokenizer.token_to_id("[EOS]")
-
-    #     for text in texts:
-    #         # Encode the entire text (no EOS yet)
-    #         encoded = self.tokenizer.encode(text, add_special_tokens=False).ids + [eos_id]
-
-    #         # Handle texts shorter than (max_length - 1) so we can add EOS and keep max_length
-    #         if len(encoded) <= self.max_length - 1:
-    #             # sequence = encoded + [eos_id]
-    #             # Pad if necessary
-    #             if len(sequence) < self.max_length:
-    #                 pad_length = self.max_length - len(sequence)
-    #                 sequence = sequence + [pad_id] * pad_length
-    #             all_sequences.append(sequence)
-    #         else:
-    #             # Create overlapping sequences
-    #             for i in range(0, len(encoded), self.stride):
-    #                 # Slice the sequence (leave space for EOS)
-    #                 sequence= encoded[i: i + self.max_length]
-    #                 # sequence = chunk + [eos_id]
-    #                 # If this is the last chunk and it's shorter than max_length, pad it
-    #                 if len(sequence) < self.max_length:
-    #                     pad_length = self.max_length - len(sequence)
-    #                     sequence = sequence + [pad_id] * pad_length
-    #                 # Only add sequences that are not just padding (i.e., not a duplicate of a previous padded chunk)
-    #                 if not all_sequences or sequence != all_sequences[-1]:
-    #                     all_sequences.append(sequence)
-    #     print(f"Created {len(all_sequences)} training sequences")
-    #     return all_sequences
-
     def __len__(self):
         return len(self.sequences)
 
@@ -131,8 +88,8 @@ class VietnameseTextDataset(Dataset):
             sequence = sequence + [pad_id] * pad_length
 
         # For causal language modeling: input is sequence[:-1], target is sequence[1:]
-        input_ids = torch.tensor(sequence[:-1], dtype=torch.long)
-        target_ids = torch.tensor(sequence[1:], dtype=torch.long)
+        input_ids = torch.tensor(sequence, dtype=torch.long)
+        target_ids = torch.tensor(sequence, dtype=torch.long)
 
         # Attention mask should be 1 for non-padding tokens and 0 for padding tokens
         attention_mask = (input_ids != pad_id).long()
@@ -201,7 +158,7 @@ def prepare_vietnamese_dataset(
             sentences_from_file
         )  # Use extend to add all sentences to one list
 
-    print(all_sentences)
+    # print(all_sentences)
     print(f"   - Number of sentences: {len(all_sentences)}")
 
     # # Step 2: Train or load tokenizer
