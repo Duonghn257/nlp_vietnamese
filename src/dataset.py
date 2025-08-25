@@ -88,8 +88,8 @@ class VietnameseTextDataset(Dataset):
             sequence = sequence + [pad_id] * pad_length
 
         # For causal language modeling: input is sequence[:-1], target is sequence[1:]
-        input_ids = torch.tensor(sequence[:-1], dtype=torch.long)
-        target_ids = torch.tensor(sequence[1:], dtype=torch.long)
+        input_ids = torch.tensor(sequence, dtype=torch.long)
+        target_ids = torch.tensor(sequence, dtype=torch.long)
 
         # Attention mask should be 1 for non-padding tokens and 0 for padding tokens
         attention_mask = (input_ids != pad_id).long()

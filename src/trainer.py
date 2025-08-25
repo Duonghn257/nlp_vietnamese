@@ -47,11 +47,14 @@ class VietnameseTrainer:
 
     def train_epoch(self) -> float:
         """Train for one epoch"""
+        from tqdm import tqdm
+
         self.model.train()
         total_loss = 0
         num_batches = 0
 
-        for batch in self.train_loader:
+        progress_bar = tqdm(self.train_loader, desc="Training (epoch)", leave=False)
+        for batch in progress_bar:
             # Move to device
             input_ids = batch["input_ids"].to(self.device)
             attention_mask = batch["attention_mask"].to(self.device)
@@ -79,8 +82,8 @@ class VietnameseTrainer:
             num_batches += 1
 
             if num_batches % 10 == 0:
-                print(
-                    f"Batch {num_batches}, Loss: {loss.item():.4f}, LR: {self.optimizer.param_groups[0]['lr']:.6f}"
+                progress_bar.set_postfix(
+                    loss=loss.item(), lr=self.optimizer.param_groups[0]["lr"]
                 )
 
         avg_loss = total_loss / num_batches
@@ -112,11 +115,13 @@ class VietnameseTrainer:
         return avg_loss
 
     def train(self, num_epochs: int, save_path: str = "vietnamese_transformer.pt"):
-        """Complete training loop"""
+        """Complete training loop with tqdm progress bar"""
+        from tqdm import trange
+
         print(f"Training on {self.device}")
         print(f"Model parameters: {sum(p.numel() for p in self.model.parameters()):,}")
 
-        for epoch in range(num_epochs):
+        for epoch in trange(num_epochs, desc="Epochs"):
             print(f"\n=== Epoch {epoch + 1}/{num_epochs} ===")
 
             # Train
@@ -152,7 +157,7 @@ class VietnameseTrainer:
         """Generate sample text to monitor training progress"""
         self.model.eval()
 
-        sample_input = "Truyện Kiều được viết"
+        sample_input = "thơ lục bát: mùa đông để mộng nằm im "
         input_ids = torch.tensor(
             [self.tokenizer.encode(sample_input, add_special_tokens=False).ids],
             device=self.device,

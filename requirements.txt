@@ -6,3 +6,8 @@ accelerate
 numpy
 tokenizers
 hf_xet
+peft
+ipykernel
+bitsandbytes 
+trl
+wandb
