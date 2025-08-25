@@ -18,6 +18,7 @@ from src.dataset import prepare_vietnamese_dataset
 from src.trainer import VietnameseTrainer
 from src.model import VietnameseTransformer
 
+
 def setup_training_config():
     """Setup training configuration"""
     config = {
@@ -139,7 +140,9 @@ def plot_training_history(train_losses, val_losses, save_path="training_history.
     print(f"📊 Training history saved to: {save_path}")
 
 
-def test_generation(model, tokenizer, device, test_cases=None):
+def test_generation(
+    model, tokenizer, device, test_cases=None, max_new_tokens: int = 20
+):
     """Test text generation with various examples"""
     if test_cases is None:
         test_cases = [
@@ -171,21 +174,21 @@ def test_generation(model, tokenizer, device, test_cases=None):
                 "temperature": 0.7,
                 "top_k": 50,
                 "top_p": 0.9,
-                "max_new_tokens": 15,
+                "max_new_tokens": max_new_tokens,
                 "name": "Balanced",
             },
             {
                 "temperature": 1.0,
                 "top_k": 20,
                 "top_p": 0.8,
-                "max_new_tokens": 15,
+                "max_new_tokens": max_new_tokens,
                 "name": "Creative",
             },
             {
                 "temperature": 0.3,
                 "top_k": 10,
                 "top_p": 1.0,
-                "max_new_tokens": 15,
+                "max_new_tokens": max_new_tokens,
                 "name": "Conservative",
             },
         ]

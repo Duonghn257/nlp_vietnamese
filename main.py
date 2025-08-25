@@ -14,13 +14,22 @@ from src import (
     VietnameseTransformer,
     prepare_vietnamese_dataset,
     test_generation,
+<<<<<<< HEAD
     load_texts_from_folder
+=======
+    load_texts_from_folder,
+>>>>>>> duongnh
 )
 
 from tokenizers import Tokenizer
 from tokenizers.models import BPE
 from tokenizers.trainers import BpeTrainer
+<<<<<<< HEAD
 from tokenizers.pre_tokenizers import Whitespace
+=======
+from tokenizers.pre_tokenizers import Whitespace, Punctuation, Sequence
+from tokenizers.normalizers import NFD, Sequence as NormalizerSequence
+>>>>>>> duongnh
 
 from typing import List, Dict
 import torch
@@ -36,6 +45,7 @@ def setup_training_config():
     """Setup training configuration"""
     config = {
         # Data configuration
+<<<<<<< HEAD
         "data_folder": "./data",
         "tokenizer_file": "vietnamese_tokenizer.json",
         "vocab_size": 5000,
@@ -46,19 +56,35 @@ def setup_training_config():
         "n_heads": 8,
         "n_layers": 6,
         "d_ff": 1024,
+=======
+        "data_folder": "data1",
+        "tokenizer_file": "vietnamese_tokenizer.json",
+        "vocab_size": 25000,
+        "max_seq_len": 512,
+        "train_split": 0.8,
+        # Model configuration
+        "d_model": 768,
+        "n_heads": 12,
+        "n_layers": 12,
+        "d_ff": 3072,
+>>>>>>> duongnh
         "dropout": 0.1,
         # Training configuration
         "batch_size": 16,
-        "learning_rate": 1e-4,
+        "learning_rate": 3e-5,
         "weight_decay": 0.01,
         "num_epochs": 10,
+<<<<<<< HEAD
         "warmup_steps": 1000,
+=======
+        "warmup_steps": 5000,
+>>>>>>> duongnh
         "device": "auto",  # 'cuda', 'cpu', or 'auto'
         # Generation configuration
         "temperature": 0.8,
         "top_k": 10,
         "top_p": 0.9,
-        "max_new_tokens": 50,
+        "max_new_tokens": 512,
         # Save configuration
         "model_save_path": "vietnamese_transformer_best.pt",
         "config_save_path": "training_config.json",
@@ -74,9 +100,43 @@ def build_tokenizer(data_path: str, save_path: str, vocab_size: int):
     tokenizer.train(files, trainer)
     tokenizer.save(save_path)
 
+<<<<<<< HEAD
 def load_tokenizer(tokenizer_path: str) -> Tokenizer:
     tokenizer = Tokenizer.from_file(tokenizer_path)
     return tokenizer
+=======
+def build_tokenizer(data_path: str, save_path: str, vocab_size: int):
+    vn_tokenizer = VietnameseTokenizer()
+    trainer = vn_tokenizer.build_tokenizer(vocab_size=vocab_size, min_frequency=2)
+
+    # Get training files
+    train_files = glob(os.path.join(data_path, "*.txt"))
+
+    if not train_files:
+        print(f"No training files found in {data_path}")
+        print(f"Please add Vietnamese text files (.txt) to {data_path} directory")
+        return
+
+    print(f"Found {len(train_files)} training files")
+
+    # Train the tokenizer
+    print("Training tokenizer...")
+    vn_tokenizer.train(train_files, trainer)
+
+    # Setup post-processor
+    vn_tokenizer.setup_post_processor()
+
+    # Save tokenizer
+    vn_tokenizer.save(save_path)
+    print(f"Tokenizer saved as {save_path}")
+
+
+def load_tokenizer(tokenizer_path: str) -> VietnameseTokenizer:
+    tokenizer = VietnameseTokenizer()
+    tokenizer.load(tokenizer_path)
+    return tokenizer
+
+>>>>>>> duongnh
 
 def plot_training_history(train_losses, val_losses, save_path="training_history.png"):
     """Plot and save training history"""
@@ -108,6 +168,10 @@ def plot_training_history(train_losses, val_losses, save_path="training_history.
     plt.show()
     print(f"📊 Training history saved to: {save_path}")
 
+<<<<<<< HEAD
+=======
+
+>>>>>>> duongnh
 def load_model_and_tokenizer(model_path, tokenizer_path):
     """Load trained model and tokenizer"""
     # Load model checkpoint
@@ -136,6 +200,7 @@ def main():
     # Load configuration
     config = setup_training_config()
 
+<<<<<<< HEAD
     build_tokenizer(
         data_path=config["data_folder"],
         save_path=config["tokenizer_file"],
@@ -153,6 +218,31 @@ def main():
         data_folder=config["data_folder"],
         tokenizer=tokenizer,
         max_length=config["max_seq_len"]
+=======
+    # Step 1: Prepare dataset
+    print(f"\n{'='*20} STEP 1: DATA PREPARATION {'='*20}")
+
+    vietnam_tokenizer: VietnameseTransformer = None
+    vietnam_tokenizer = load_tokenizer(config["tokenizer_file"])
+    if vietnam_tokenizer == None:
+        build_tokenizer(
+            data_path=config["data_folder"],
+            save_path=config["tokenizer_file"],
+            vocab_size=config["vocab_size"],
+        )
+
+        print(f"📊 Training Configuration:")
+        for key, value in config.items():
+            print(f"  {key}: {value}")
+
+        vietnam_tokenizer = load_tokenizer(config["tokenizer_file"])
+
+    tokenizer = vietnam_tokenizer.tokenizer
+    train_loader, val_loader = prepare_vietnamese_dataset(
+        data_folder=config["data_folder"],
+        tokenizer=tokenizer,
+        max_length=config["max_seq_len"],
+>>>>>>> duongnh
     )
     
     print(f"✅ Dataset prepared successfully!")
@@ -165,6 +255,7 @@ def main():
 
     model = VietnameseTransformer(
         vocab_size=tokenizer.get_vocab_size(),
+<<<<<<< HEAD
         d_model=config['d_model'],
         n_heads=config['n_heads'],
         n_layers=config['n_layers'],
@@ -172,6 +263,15 @@ def main():
         max_seq_len=config['max_seq_len'],
         dropout=config['dropout'],
         pad_token_id=tokenizer.token_to_id("[PAD]")
+=======
+        d_model=config["d_model"],
+        n_heads=config["n_heads"],
+        n_layers=config["n_layers"],
+        d_ff=config["d_ff"],
+        max_seq_len=config["max_seq_len"],
+        dropout=config["dropout"],
+        pad_token_id=tokenizer.token_to_id("[PAD]"),
+>>>>>>> duongnh
     )
     # exit()
     total_params = sum(p.numel() for p in model.parameters())
@@ -204,7 +304,13 @@ def main():
     # Test initial generation (before training)
     print(f"\n{'='*20} INITIAL GENERATION TEST {'='*20}")
     print("Testing generation before training (should be random):")
-    test_generation(model, tokenizer, trainer.device, ["Truyện Kiều được viết"])
+    test_generation(
+        model,
+        tokenizer,
+        trainer.device,
+        ["thơ lục bát: ai ơi xa bến quê hương "],
+        max_new_tokens=20,
+    )
 
     # Step 4: Train the model
     print(f"\n{'='*20} STEP 4: TRAINING {'='*20}")
@@ -252,6 +358,7 @@ def main():
         print("✅ Loaded best model for testing")
 
     # Test with multiple examples
+<<<<<<< HEAD
     test_generation(model, tokenizer, trainer.device)
 
     # Step 7: Save final configuration
@@ -312,6 +419,48 @@ def test():
         model.load_state_dict(checkpoint['model_state_dict'])
         print("✅ Loaded best model for testing")
     test_generation(model, tokenizer, device="cpu", test_cases = ["Sóng"])
+=======
+    test_generation(
+        model, tokenizer, trainer.device, ["thơ lục bát: ai ơi xa bến quê hương"]
+    )
+
+
+def test(test_cases: list[str], max_new_tokens: int):
+    config = setup_training_config()
+    vietnam_tokenizer = load_tokenizer(config["tokenizer_file"])
+    tokenizer = vietnam_tokenizer.tokenizer
+    model = VietnameseTransformer(
+        vocab_size=tokenizer.get_vocab_size(),
+        d_model=config["d_model"],
+        n_heads=config["n_heads"],
+        n_layers=config["n_layers"],
+        d_ff=config["d_ff"],
+        max_seq_len=config["max_seq_len"],
+        dropout=config["dropout"],
+        pad_token_id=tokenizer.token_to_id("[PAD]"),
+    )
+
+    # Step 6: Final generation test
+    print(f"\n{'='*20} STEP 6: FINAL GENERATION TEST {'='*20}")
+    print(config["model_save_path"])
+    # Load best model for testing
+    if os.path.exists(config["model_save_path"]):
+        checkpoint = torch.load(
+            "vietnamese_transformer_interrupted.pt",
+            map_location="cpu",
+            weights_only=False,
+        )
+        model.load_state_dict(checkpoint["model_state_dict"])
+        print("✅ Loaded best model for testing")
+    test_generation(
+        model,
+        tokenizer,
+        device="cpu",
+        test_cases=test_cases,
+        max_new_tokens=max_new_tokens,
+    )
+
+>>>>>>> duongnh
 
 if __name__ == "__main__":
     # Add argument parser for command line options
@@ -355,5 +504,10 @@ if __name__ == "__main__":
     config["device"] = args.device
 
     # Run training
+<<<<<<< HEAD
     # main()
     test()
+=======
+    main()
+    test(test_cases=["thơ lục bát: mùa đông để mộng nằm im "], max_new_tokens=150)
+>>>>>>> duongnh
