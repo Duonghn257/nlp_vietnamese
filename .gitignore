@@ -4,6 +4,7 @@ checkpoints/
 .env
 /*.pt
 test.py
+data/
 test
 *.json
 10000books/
