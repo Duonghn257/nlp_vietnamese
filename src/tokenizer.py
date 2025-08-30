@@ -4,10 +4,36 @@ from typing import List, Dict, Tuple, Optional
 from collections import Counter, defaultdict
 import pickle
 import json
+import os
+import glob
+
+from tokenizers import Tokenizer, normalizers, pre_tokenizers
+from tokenizers.models import BPE, WordPiece
+from tokenizers.trainers import BpeTrainer
+from tokenizers.trainers import WordPieceTrainer
+from tokenizers.pre_tokenizers import (
+    Punctuation,
+    Sequence,
+    Digits,
+    Metaspace,
+    Whitespace,
+)
+from tokenizers.normalizers import NFC, NFD, Lowercase, Strip, StripAccents
+from tokenizers.processors import TemplateProcessing
+from transformers import AutoTokenizer, AutoModelForTokenClassification
+from transformers import pipeline
+
 
 
 class VietnamesePreprocessor:
     """Vietnamese text preprocessor handling normalization and cleaning"""
+
+    tokenizer = AutoTokenizer.from_pretrained("NlpHUST/vi-word-segmentation")
+    model = AutoModelForTokenClassification.from_pretrained(
+        "NlpHUST/vi-word-segmentation"
+    )
+
+    nlp = pipeline("token-classification", model=model, tokenizer=tokenizer)
 
     def __init__(self):
         # Vietnamese diacritics normalization patterns
@@ -20,6 +46,18 @@ class VietnamesePreprocessor:
             "ù|ú|ụ|ủ|ũ": "u",
             "ỳ|ý|ỵ|ỷ|ỹ": "y",
         }
+
+    def word_segment(self, text: str) -> str:
+        ner_results = self.nlp(text)
+        example_tok = ""
+        for e in ner_results:
+            if "##" in e["word"]:
+                example_tok = example_tok + e["word"].replace("##", "")
+            elif e["entity"] == "I":
+                example_tok = example_tok + "_" + e["word"]
+            else:
+                example_tok = example_tok + " " + e["word"]
+        return example_tok
 
     def normalize_unicode(self, text: str) -> str:
         """Normalize Unicode characters to consistent form"""
@@ -36,6 +74,7 @@ class VietnamesePreprocessor:
 
         # Remove leading/trailing whitespace
         text = text.strip()
+
 
         # Handle common punctuation normalization
         text = re.sub(r'["""]', '"', text)
@@ -76,216 +115,264 @@ class VietnamesePreprocessor:
 
 
 class VietnameseTokenizer:
-    """Custom tokenizer for Vietnamese text using BPE-like approach"""
+    def __init__(self):
+        self.tokenizer: Tokenizer = None
 
-    def __init__(self, vocab_size: int = 10000):
-        self.vocab_size = vocab_size
-        self.word_to_id = {}
-        self.id_to_word = {}
-        self.vocab = set()
-
-        # Special tokens
-        self.PAD_TOKEN = "<pad>"
-        self.UNK_TOKEN = "<unk>"
-        self.BOS_TOKEN = "<bos>"  # Beginning of sequence
-        self.EOS_TOKEN = "<eos>"  # End of sequence
-
-        self.special_tokens = [
-            self.PAD_TOKEN,
-            self.UNK_TOKEN,
-            self.BOS_TOKEN,
-            self.EOS_TOKEN,
-        ]
-
-        # Vietnamese syllable pattern
-        self.vietnamese_syllable_pattern = re.compile(
-            r"[a-záàảãạăắằẳẵặâấầẩẫậéèẻẽẹêếềểễệíìỉĩịóòỏõọôốồổỗộơớờởỡợúùủũụưứừửữựýỳỷỹỵđ]+",
-            re.IGNORECASE,
+    def create_vietnamese_normalizer(self):
+        """Create a specialized normalizer for Vietnamese text"""
+        return normalizers.Sequence(
+            [
+                Strip(),  # Remove leading/trailing whitespace
+                NFC(),  # Normalize Vietnamese diacritics properly
+            ]
         )
 
-    def _extract_vietnamese_words(self, text: str) -> List[str]:
-        """Extract Vietnamese words/syllables from text"""
-        # Find Vietnamese syllables
-        vietnamese_words = self.vietnamese_syllable_pattern.findall(text.lower())
-
-        # Find punctuation and numbers
-        other_tokens = re.findall(r"[^\w\s]|\d+", text)
-
-        # Combine and maintain rough order (this is simplified)
-        all_tokens = []
-        words_iter = iter(vietnamese_words)
-        other_iter = iter(other_tokens)
-
-        # Simple tokenization: split by whitespace and extract tokens
-        for token in text.split():
-            if self.vietnamese_syllable_pattern.match(token.lower()):
-                all_tokens.append(token.lower())
-            else:
-                # Handle punctuation and mixed tokens
-                sub_tokens = re.findall(r"[^\w\s]|\w+", token.lower())
-                all_tokens.extend(sub_tokens)
-
-        return all_tokens
-
-    def train(self, texts: List[str]):
-        """Train tokenizer on Vietnamese texts"""
-        print("Training Vietnamese tokenizer...")
-
-        # Collect all tokens
-        all_tokens = []
-        for text in texts:
-            tokens = self._extract_vietnamese_words(text)
-            all_tokens.extend(tokens)
-
-        # Count token frequencies
-        token_counts = Counter(all_tokens)
-
-        # Start with special tokens
-        vocab = self.special_tokens.copy()
-
-        # Add most frequent tokens up to vocab_size
-        most_common = token_counts.most_common(
-            self.vocab_size - len(self.special_tokens)
-        )
-        for token, count in most_common:
-            if len(vocab) >= self.vocab_size:
-                break
-            if token not in vocab:
-                vocab.append(token)
-
-        # Create mappings
-        self.word_to_id = {word: i for i, word in enumerate(vocab)}
-        self.id_to_word = {i: word for i, word in enumerate(vocab)}
-        self.vocab = set(vocab)
-
-        print(f"Vocabulary size: {len(self.vocab)}")
-        print(f"Most common tokens: {most_common[:10]}")
-
-    def encode(self, text: str, add_special_tokens: bool = True) -> List[int]:
-        """Encode text to token IDs"""
-        tokens = self._extract_vietnamese_words(text)
-
-        # Convert to IDs
-        token_ids = []
-
-        if add_special_tokens:
-            token_ids.append(self.word_to_id[self.BOS_TOKEN])
-
-        for token in tokens:
-            if token in self.word_to_id:
-                token_ids.append(self.word_to_id[token])
-            else:
-                token_ids.append(self.word_to_id[self.UNK_TOKEN])
-
-        if add_special_tokens:
-            token_ids.append(self.word_to_id[self.EOS_TOKEN])
-
-        return token_ids
-
-    def decode(self, token_ids: List[int], skip_special_tokens: bool = True) -> str:
-        """Decode token IDs back to text"""
-        tokens = []
-        for token_id in token_ids:
-            if token_id in self.id_to_word:
-                token = self.id_to_word[token_id]
-                if skip_special_tokens and token in self.special_tokens:
-                    continue
-                tokens.append(token)
-
-        # Join tokens with spaces (simplified for Vietnamese)
-        return " ".join(tokens)
-
-    def save(self, filepath: str):
-        """Save tokenizer to file"""
-        tokenizer_data = {
-            "vocab_size": self.vocab_size,
-            "word_to_id": self.word_to_id,
-            "id_to_word": self.id_to_word,
-            "vocab": list(self.vocab),
-            "special_tokens": self.special_tokens,
+    def preprocess_vietnamese_text(self, text: str) -> str:
+        """Advanced Vietnamese text preprocessing"""
+        # Handle common Vietnamese abbreviations and contractions
+        vietnamese_contractions = {
+            "ko": "không",
+            "k": "không",
+            "dc": "được",
+            "đc": "được",
+            "vs": "với",
+            "tui": "tôi",
+            "mik": "mình",
+            "mk": "mình",
+            "ny": "người yêu",
+            "cx": "cũng",
+            "hok": "không",
+            "hjk": "không",
+            "onl": "online",
+            "offl": "offline",
         }
 
-        with open(filepath, "w", encoding="utf-8") as f:
-            json.dump(tokenizer_data, f, ensure_ascii=False, indent=2)
+        # Replace contractions
+        words = text.split()
+        processed_words = []
+        for word in words:
+            clean_word = re.sub(r"[^\w\sÀ-ỹ]", "", word.lower())
+            if clean_word in vietnamese_contractions:
+                processed_words.append(vietnamese_contractions[clean_word])
+            else:
+                processed_words.append(word)
+        text = " ".join(processed_words)
 
-        print(f"Tokenizer saved to {filepath}")
+        # Normalize repeated characters (hahaha -> haha)
+        text = re.sub(r"(.)\1{2,}", r"\1\1", text)
 
-    def load(self, filepath: str):
-        """Load tokenizer from file"""
-        with open(filepath, "r", encoding="utf-8") as f:
-            tokenizer_data = json.load(f)
+        # Fix common spacing issues around punctuation
+        text = re.sub(r"\s+([,.!?;:])", r"\1", text)
+        text = re.sub(r"([,.!?;:])\s*", r"\1 ", text)
 
-        self.vocab_size = tokenizer_data["vocab_size"]
-        self.word_to_id = tokenizer_data["word_to_id"]
-        # Convert string keys back to int for id_to_word
-        self.id_to_word = {int(k): v for k, v in tokenizer_data["id_to_word"].items()}
-        self.vocab = set(tokenizer_data["vocab"])
-        self.special_tokens = tokenizer_data["special_tokens"]
+        # Normalize whitespace
+        text = re.sub(r"\s+", " ", text).lstrip()
 
-        print(f"Tokenizer loaded from {filepath}")
+        return text
+
+    def create_vietnamese_pretokenizer(self):
+        """Create a specialized pre-tokenizer for Vietnamese"""
+        return pre_tokenizers.Sequence(
+            [
+                # Split on whitespace first to handle words properly
+                Whitespace(),
+                # Handle digits - keep them together for Vietnamese (like years, phone numbers)
+                Digits(individual_digits=False),
+            ]
+        )
+
+    def build_tokenizer(
+        self,
+        vocab_size: int = 25000,
+        min_frequency: int = 2,
+        special_tokens: List[str] = None,
+    ):
+        """Build the Vietnamese tokenizer"""
+
+        if special_tokens is None:
+            special_tokens = [
+                "[PAD]",
+                "[UNK]",
+                "[CLS]",
+                "[SEP]",
+                "[MASK]",
+                "[BOS]",
+                "[EOS]",
+                "[LF]",
+            ]
+
+        # Initialize tokenizer with BPE model
+        self.tokenizer = Tokenizer(BPE(unk_token="[UNK]"))
+
+        # Set normalizer
+        self.tokenizer.normalizer = self.create_vietnamese_normalizer()
+
+        # Set pre-tokenizer
+        self.tokenizer.pre_tokenizer = self.create_vietnamese_pretokenizer()
+
+        # Configure trainer
+        trainer = BpeTrainer(
+            vocab_size=vocab_size,
+            min_frequency=min_frequency,
+            special_tokens=[
+                "[PAD]",
+                "[UNK]",
+                "[CLS]",
+                "[SEP]",
+                "[MASK]",
+                "[BOS]",
+                "[EOS]",
+                "[LF]",
+            ],
+            initial_alphabet = [
+                "a", "á", "à", "ả", "ã", "ạ",
+                "ă", "ắ", "ằ", "ẳ", "ẵ", "ặ",
+                "â", "ấ", "ầ", "ẩ", "ẫ", "ậ",
+                "b", "c", "d", "đ",
+                "e", "é", "è", "ẻ", "ẽ", "ẹ",
+                "ê", "ế", "ề", "ể", "ễ", "ệ",
+                "g", "h", "i", "í", "ì", "ỉ", "ĩ", "ị",
+                "k", "l", "m", "n",
+                "o", "ó", "ò", "ỏ", "õ", "ọ",
+                "ô", "ố", "ồ", "ổ", "ỗ", "ộ",
+                "ơ", "ớ", "ờ", "ở", "ỡ", "ợ",
+                "p", "q", "r", "s", "t",
+                "u", "ú", "ù", "ủ", "ũ", "ụ",
+                "ư", "ứ", "ừ", "ử", "ữ", "ự",
+                "v", "x", "y", "ý", "ỳ", "ỷ", "ỹ", "ỵ",
+
+                "A", "Á", "À", "Ả", "Ã", "Ạ",
+                "Ă", "Ắ", "Ằ", "Ẳ", "Ẵ", "Ặ",
+                "Â", "Ấ", "Ầ", "Ẩ", "Ẫ", "Ậ",
+                "B", "C", "D", "Đ",
+                "E", "É", "È", "Ẻ", "Ẽ", "Ẹ",
+                "Ê", "Ế", "Ề", "Ể", "Ễ", "Ệ",
+                "G", "H", "I", "Í", "Ì", "Ỉ", "Ĩ", "Ị",
+                "K", "L", "M", "N",
+                "O", "Ó", "Ò", "Ỏ", "Õ", "Ọ",
+                "Ô", "Ố", "Ồ", "Ổ", "Ỗ", "Ộ",
+                "Ơ", "Ớ", "Ờ", "Ở", "Ỡ", "Ợ",
+                "P", "Q", "R", "S", "T",
+                "U", "Ú", "Ù", "Ủ", "Ũ", "Ụ",
+                "Ư", "Ứ", "Ừ", "Ử", "Ữ", "Ự",
+                "V", "X", "Y", "Ý", "Ỳ", "Ỷ", "Ỹ", "Ỵ"
+            ],
+            continuing_subword_prefix="##", 
+        )
+
+        return trainer
+
+    def train(self, files: List[str], trainer: WordPieceTrainer):
+        """Train the tokenizer on Vietnamese text files"""
+        # Preprocess files before training
+        processed_files = []
+
+        for file_path in files:
+            processed_file = file_path.replace(".txt", "_processed.txt")
+            with open(file_path, "r", encoding="utf-8") as infile, open(
+                processed_file, "w", encoding="utf-8"
+            ) as outfile:
+
+                for line in infile:
+                    cleaned_line = line
+                    if cleaned_line:  # Only write non-empty lines
+                        outfile.write(cleaned_line + "\n")
+
+            processed_files.append(processed_file)
+
+        # Train on processed files
+        self.tokenizer.train(processed_files, trainer)
+
+        # Clean up processed files
+        for pf in processed_files:
+            if os.path.exists(pf):
+                os.remove(pf)
+
+    def setup_post_processor(self):
+        """Setup post-processor for Vietnamese text"""
+        self.tokenizer.post_processor = TemplateProcessing(
+            single="[CLS] $A [SEP]",
+            pair="[CLS] $A [SEP] $B:1 [SEP]:1",
+            special_tokens=[
+                ("[CLS]", self.tokenizer.token_to_id("[CLS]")),
+                ("[SEP]", self.tokenizer.token_to_id("[SEP]")),
+            ],
+        )
+
+    def save(self, path: str):
+        """Save the tokenizer"""
+        self.tokenizer.save(path)
+
+    def load(self, path: str) -> Tokenizer:
+        """Load a saved tokenizer"""
+        self.tokenizer = Tokenizer.from_file(path)
+        return self.tokenizer
+
+    def encode(self, text: str):
+        """Encode text with preprocessing"""
+        processed_text = self.preprocess_vietnamese_text(text)
+        return self.tokenizer.encode(processed_text)
+
+    def decode(self, ids: List[int]):
+        """Decode token ids back to text"""
+        return self.tokenizer.decode(ids)
+
+    def test_tokenizer(self):
+        """Test the tokenizer with Vietnamese examples"""
+        test_sentences = [
+            "Xin chào, tôi là một người Việt Nam.",
+            "Hôm nay trời đẹp quá, mình đi chơi không?",
+            "Tôi rất thích ăn phở và bánh mì.",
+            "Anh ấy nói tiếng Anh rất giỏi.",
+            "Cô giáo dạy môn Toán rất tốt.",
+            "123 con gà, 456 con vịt đang bơi trong ao.",
+            "Email: test@gmail.com, Phone: 0123-456-789",
+        ]
+
+        print("=== TESTING VIETNAMESE TOKENIZER ===")
+        for sentence in test_sentences:
+            encoded = self.encode(sentence)
+            decoded = self.decode(encoded.ids)
+
+            print(f"Original: {sentence}")
+            print(f"Tokens: {encoded.tokens}")
+            print(f"Decoded: {decoded}")
+            print(f"Token count: {len(encoded.tokens)}")
+            print("-" * 50)
 
 
-# Example usage and testing
+# Usage example
+def main():
+    # Create tokenizer instance
+    vn_tokenizer = VietnameseTokenizer()
+
+    # Build tokenizer with Vietnamese-specific settings
+    trainer = vn_tokenizer.build_tokenizer(vocab_size=25000, min_frequency=2)
+
+    # Get training files
+    train_files = glob.glob(os.path.join("./train_data", "*.txt"))
+
+    if not train_files:
+        print("No training files found in ./train_data/")
+        print("Please add Vietnamese text files (.txt) to ./train_data/ directory")
+        return
+
+    print(f"Found {len(train_files)} training files")
+
+    # Train the tokenizer
+    print("Training tokenizer...")
+    vn_tokenizer.train(train_files, trainer)
+
+    # # Setup post-processor
+    # vn_tokenizer.setup_post_processor()
+
+    # Save tokenizer
+    vn_tokenizer.save("vietnamese_enhanced_tokenizer.json")
+    print("Tokenizer saved as 'vietnamese_enhanced_tokenizer.json'")
+
+    # Test the tokenizer
+    vn_tokenizer.test_tokenizer()
+
+
 if __name__ == "__main__":
-    # Initialize preprocessor
-    preprocessor = VietnamesePreprocessor()
-
-    # Sample Vietnamese text (Truyện Kiều excerpt)
-    sample_text = """
-    Trăm năm trong cõi người ta,
-    Chữ tài chữ mệnh khéo là ghét nhau.
-    Trải qua một cuộc bể dâu,
-    Những điều trông thấy mà đau đớn lòng.
-    Lạ gì bỉ sắc tư phong,
-    Trời xanh quen thói má hồng đánh ghen.
-    Cũng đành rằng số kiếp en,
-    Vì chưng nàng sắc nên thêm nàng tài.
-    """
-
-    # Preprocess the text
-    print("=== Text Preprocessing ===")
-    cleaned_text = preprocessor.clean_text(sample_text)
-    print(f"Cleaned text: {cleaned_text[:100]}...")
-
-    sentences = preprocessor.segment_sentences(cleaned_text)
-    print(f"Number of sentences: {len(sentences)}")
-    print(f"First sentence: {sentences[0]}")
-
-    # Train tokenizer
-    print("\n=== Tokenizer Training ===")
-    tokenizer = VietnameseTokenizer(vocab_size=1000)
-
-    # Use sentences for training
-    tokenizer.train(sentences)
-
-    # Test tokenization
-    print("\n=== Tokenization Examples ===")
-    test_sentence = "Truyện Kiều được viết bởi Nguyễn Du."
-
-    # Encode
-    encoded = tokenizer.encode(test_sentence)
-    print(f"Original: {test_sentence}")
-    print(f"Encoded: {encoded}")
-
-    # Decode
-    decoded = tokenizer.decode(encoded)
-    print(f"Decoded: {decoded}")
-
-    # Test with your example
-    print(f"\n=== Your Example ===")
-    input_text = "Truyện Kiều được viết"
-    target_text = "bởi Nguyễn Du."
-
-    input_encoded = tokenizer.encode(input_text, add_special_tokens=False)
-    target_encoded = tokenizer.encode(target_text, add_special_tokens=False)
-
-    print(f"Input: '{input_text}' -> {input_encoded}")
-    print(f"Target: '{target_text}' -> {target_encoded}")
-
-    # Save tokenizer for later use
-    tokenizer.save("vietnamese_tokenizer.json")
-
-    print(f"\nTokenizer vocabulary sample:")
-    sample_vocab = list(tokenizer.vocab)[:20]
-    for token in sample_vocab:
-        print(f"  '{token}' -> {tokenizer.word_to_id[token]}")
+    main()
