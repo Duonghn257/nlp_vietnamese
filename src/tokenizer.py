@@ -24,7 +24,6 @@ from transformers import AutoTokenizer, AutoModelForTokenClassification
 from transformers import pipeline
 
 
-
 class VietnamesePreprocessor:
     """Vietnamese text preprocessor handling normalization and cleaning"""
 
@@ -68,13 +67,6 @@ class VietnamesePreprocessor:
         """Clean and normalize Vietnamese text"""
         # Normalize unicode first
         text = self.normalize_unicode(text)
-
-        # Remove extra whitespaces
-        text = re.sub(r"\s+", " ", text)
-
-        # Remove leading/trailing whitespace
-        text = text.strip()
-
 
         # Handle common punctuation normalization
         text = re.sub(r'["""]', '"', text)

@@ -208,7 +208,7 @@ def main():
         dropout=config["dropout"],
         pad_token_id=tokenizer.token_to_id("[PAD]"),
     )
-
+    # exit()
     total_params = sum(p.numel() for p in model.parameters())
     trainable_params = sum(p.numel() for p in model.parameters() if p.requires_grad)
 
