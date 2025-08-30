@@ -2,3 +2,7 @@
 2. BPE Tokenizer (Byte Pair Encoding)
 3. Self-Attention, Masked Self Attention mechanism
 4. Decoder-only Transformer
+
+## Training
+1. Pre-processing
+- 

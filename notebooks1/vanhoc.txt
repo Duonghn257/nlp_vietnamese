@@ -1,0 +1,7 @@
+	
++ Trích nguồn tài liệu câu trả lời Chatbot
++ Xem nguồn tài liệu (hyperlink)
++ Chatbot kịch bản theo flow
++ Mapping và Redirect tới phiên hội thoại với HR liên quan
++ Xoá lịch sử phiên hội thoại
++ Sửa tên phiên hội thoại
