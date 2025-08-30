@@ -17,6 +17,7 @@ from src import (
     test_generation,
     load_texts_from_folder,
     generate_text,
+    setup_training_config,
 )
 
 from tokenizers import Tokenizer
@@ -33,40 +34,6 @@ import matplotlib.pyplot as plt
 import json
 import argparse
 import random
-
-
-def setup_training_config():
-    """Setup training configuration"""
-    config = {
-        # Data configuration
-        "data_folder": "data/clean_data",
-        "tokenizer_file": "vietnamese_tokenizer.json",
-        "vocab_size": 25000,
-        "max_seq_len": 512,
-        "train_split": 0.8,
-        # Model configuration
-        "d_model": 768,
-        "n_heads": 12,
-        "n_layers": 12,
-        "d_ff": 3072,
-        "dropout": 0.1,
-        # Training configuration
-        "batch_size": 16,
-        "learning_rate": 3e-5,
-        "weight_decay": 0.01,
-        "num_epochs": 50,
-        "warmup_steps": 5000,
-        "device": "auto",  # 'cuda', 'cpu', or 'auto'
-        # Generation configuration
-        "temperature": 0.8,
-        "top_k": 10,
-        "top_p": 0.9,
-        "max_new_tokens": 256,
-        # Save configuration
-        "model_save_path": "vietnamese_transformer_best.pt",
-        "config_save_path": "training_config.json",
-    }
-    return config
 
 
 def build_tokenizer(data_path: str, save_path: str, vocab_size: int):
@@ -132,26 +99,6 @@ def plot_training_history(train_losses, val_losses, save_path="training_history.
     print(f"📊 Training history saved to: {save_path}")
 
 
-def load_model_and_tokenizer(model_path, tokenizer_path):
-    """Load trained model and tokenizer"""
-    # Load model checkpoint
-    checkpoint = torch.load(model_path, map_location="cpu")
-    model_config = checkpoint["model_config"]
-
-    # Create model
-    model = VietnameseTransformer(**model_config)
-    model.load_state_dict(checkpoint["model_state_dict"])
-
-    # Load tokenizer
-    tokenizer = VietnameseTokenizer()
-    tokenizer.load(tokenizer_path)
-
-    print(f"✅ Model loaded from: {model_path}")
-    print(f"✅ Tokenizer loaded from: {tokenizer_path}")
-
-    return model, tokenizer
-
-
 def main():
     """Main training function"""
     print("🇻🇳 Vietnamese Text Generation Training")
@@ -164,23 +111,18 @@ def main():
     print(f"\n{'='*20} STEP 1: DATA PREPARATION {'='*20}")
 
     vietnam_tokenizer: VietnameseTransformer = None
-    try:
-        vietnam_tokenizer = load_tokenizer(config["tokenizer_file"])
-    except Exception as e:
-        print(e)
 
-    if vietnam_tokenizer == None:
-        build_tokenizer(
-            data_path=config["data_folder"],
-            save_path=config["tokenizer_file"],
-            vocab_size=config["vocab_size"],
-        )
+    build_tokenizer(
+        data_path=config["data_folder"],
+        save_path=config["tokenizer_file"],
+        vocab_size=config["vocab_size"],
+    )
 
-        print(f"📊 Training Configuration:")
-        for key, value in config.items():
-            print(f"  {key}: {value}")
+    print(f"📊 Training Configuration:")
+    for key, value in config.items():
+        print(f"  {key}: {value}")
 
-        vietnam_tokenizer = load_tokenizer(config["tokenizer_file"])
+    vietnam_tokenizer = load_tokenizer(config["tokenizer_file"])
 
     tokenizer = vietnam_tokenizer.tokenizer
     train_loader, val_loader = prepare_vietnamese_dataset(
@@ -334,7 +276,6 @@ def invoke(prompt: str, max_new_tokens: int):
         device="cuda",
         max_new_tokens=max_new_tokens,
     )
-    print(response)
     return response
 
 
@@ -381,46 +322,6 @@ def test(test_cases: list[str], device: str, max_new_tokens: int):
 
 
 if __name__ == "__main__":
-    # Add argument parser for command line options
-    parser = argparse.ArgumentParser(
-        description="Train Vietnamese Text Generation Model"
-    )
-    parser.add_argument(
-        "--data_folder",
-        type=str,
-        default="./data",
-        help="Path to the Vietnamese text data file",
-    )
-    parser.add_argument(
-        "--vocab_size", type=int, default=20000, help="Vocabulary size for tokenizer"
-    )
-    parser.add_argument(
-        "--batch_size", type=int, default=16, help="Training batch size"
-    )
-    parser.add_argument(
-        "--epochs", type=int, default=50, help="Number of training epochs"
-    )
-    parser.add_argument("--lr", type=float, default=1e-4, help="Learning rate")
-    parser.add_argument(
-        "--device",
-        type=str,
-        default="auto",
-        choices=["auto", "cpu", "cuda"],
-        help="Training device",
-    )
-
-    args = parser.parse_args()
-
-    # Update config with command line arguments
-    config = setup_training_config()
-    config["data_folder"] = args.data_folder
-    # config["data_file"] = args.data_file
-    config["vocab_size"] = args.vocab_size
-    config["batch_size"] = args.batch_size
-    config["num_epochs"] = args.epochs
-    config["learning_rate"] = args.lr
-    config["device"] = args.device
-
     # Run training
     main()
     # response = invoke(
