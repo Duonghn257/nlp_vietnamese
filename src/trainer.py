@@ -157,7 +157,7 @@ class VietnameseTrainer:
         """Generate sample text to monitor training progress"""
         self.model.eval()
 
-        sample_input = "Truyện Kiều được viết"
+        sample_input = "thơ lục bát: mùa đông để mộng nằm im "
         input_ids = torch.tensor(
             [self.tokenizer.encode(sample_input, add_special_tokens=False).ids],
             device=self.device,

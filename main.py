@@ -4,6 +4,7 @@ Complete training script for Vietnamese Text Generation using Decoder-Only Trans
 Usage: python train_vietnamese_transformer.py
 """
 import os
+
 os.environ["CUDA_VISIBLE_DEVICES"] = "0"
 from torch.utils.data.datapipes import datapipe
 from src import (
@@ -207,7 +208,7 @@ def main():
         dropout=config["dropout"],
         pad_token_id=tokenizer.token_to_id("[PAD]"),
     )
-
+    # exit()
     total_params = sum(p.numel() for p in model.parameters())
     trainable_params = sum(p.numel() for p in model.parameters() if p.requires_grad)
 
@@ -342,7 +343,7 @@ def test(test_cases: list[str], device: str, max_new_tokens: int):
         device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     else:
         device = torch.device(device)
-        
+
     config = setup_training_config()
     vietnam_tokenizer = load_tokenizer(config["tokenizer_file"])
     tokenizer = vietnam_tokenizer.tokenizer

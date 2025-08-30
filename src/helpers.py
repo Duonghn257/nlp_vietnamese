@@ -208,7 +208,12 @@ def test_generation(
                     do_sample=True,
                 )
 
-            generated_text = tokenizer.decode(generated[0].cpu().tolist()).replace(" ##", "").replace("_", " ").replace("[LF]", "\n")
+            generated_text = (
+                tokenizer.decode(generated[0].cpu().tolist())
+                .replace(" ##", "")
+                .replace("_", " ")
+                .replace("[LF]", "\n")
+            )
             print(f"  {config['name']}: '{generated_text}'")
 
 
