@@ -8,21 +8,31 @@ import os
 import glob
 
 from tokenizers import Tokenizer, normalizers, pre_tokenizers
-from tokenizers.models import BPE
+from tokenizers.models import BPE, WordPiece
 from tokenizers.trainers import BpeTrainer
+from tokenizers.trainers import WordPieceTrainer
 from tokenizers.pre_tokenizers import (
     Punctuation,
     Sequence,
     Digits,
     Metaspace,
-    WhitespaceSplit,
+    Whitespace,
 )
-from tokenizers.normalizers import NFC, Lowercase, Strip, StripAccents
+from tokenizers.normalizers import NFC, NFD, Lowercase, Strip, StripAccents
 from tokenizers.processors import TemplateProcessing
+from transformers import AutoTokenizer, AutoModelForTokenClassification
+from transformers import pipeline
 
 
 class VietnamesePreprocessor:
     """Vietnamese text preprocessor handling normalization and cleaning"""
+
+    tokenizer = AutoTokenizer.from_pretrained("NlpHUST/vi-word-segmentation")
+    model = AutoModelForTokenClassification.from_pretrained(
+        "NlpHUST/vi-word-segmentation"
+    )
+
+    nlp = pipeline("token-classification", model=model, tokenizer=tokenizer)
 
     def __init__(self):
         # Vietnamese diacritics normalization patterns
@@ -36,6 +46,18 @@ class VietnamesePreprocessor:
             "ỳ|ý|ỵ|ỷ|ỹ": "y",
         }
 
+    def word_segment(self, text: str) -> str:
+        ner_results = self.nlp(text)
+        example_tok = ""
+        for e in ner_results:
+            if "##" in e["word"]:
+                example_tok = example_tok + e["word"].replace("##", "")
+            elif e["entity"] == "I":
+                example_tok = example_tok + "_" + e["word"]
+            else:
+                example_tok = example_tok + " " + e["word"]
+        return example_tok
+
     def normalize_unicode(self, text: str) -> str:
         """Normalize Unicode characters to consistent form"""
         # Use NFC normalization for Vietnamese
@@ -45,12 +67,6 @@ class VietnamesePreprocessor:
         """Clean and normalize Vietnamese text"""
         # Normalize unicode first
         text = self.normalize_unicode(text)
-
-        # Remove extra whitespaces
-        text = re.sub(r"\s+", " ", text)
-
-        # Remove leading/trailing whitespace
-        text = text.strip()
 
         # Handle common punctuation normalization
         text = re.sub(r'["""]', '"', text)
@@ -100,7 +116,6 @@ class VietnameseTokenizer:
             [
                 Strip(),  # Remove leading/trailing whitespace
                 NFC(),  # Normalize Vietnamese diacritics properly
-                # Custom Vietnamese text cleaning will be done in preprocessing
             ]
         )
 
@@ -143,7 +158,7 @@ class VietnameseTokenizer:
         text = re.sub(r"([,.!?;:])\s*", r"\1 ", text)
 
         # Normalize whitespace
-        text = re.sub(r"\s+", " ", text).strip()
+        text = re.sub(r"\s+", " ", text).lstrip()
 
         return text
 
@@ -152,13 +167,9 @@ class VietnameseTokenizer:
         return pre_tokenizers.Sequence(
             [
                 # Split on whitespace first to handle words properly
-                WhitespaceSplit(),
+                Whitespace(),
                 # Handle digits - keep them together for Vietnamese (like years, phone numbers)
                 Digits(individual_digits=False),
-                # Handle punctuation carefully for Vietnamese
-                Punctuation(behavior="isolated"),
-                # Use Metaspace for subword handling
-                Metaspace(replacement="▁"),
             ]
         )
 
@@ -179,21 +190,11 @@ class VietnameseTokenizer:
                 "[MASK]",
                 "[BOS]",
                 "[EOS]",
-                # Vietnamese-specific tokens
-                "[NUM]",  # For numbers
-                "[ENG]",  # For English words in Vietnamese text
-                "[LAUGH]",  # For laughter expressions (haha, hihi, etc.)
-                "[EMOTE]",  # For emoticons and emojis
+                "[LF]",
             ]
 
         # Initialize tokenizer with BPE model
-        self.tokenizer = Tokenizer(
-            BPE(
-                unk_token="[UNK]",
-                fuse_unk=True,
-                byte_fallback=False,  # Better for Vietnamese
-            )
-        )
+        self.tokenizer = Tokenizer(BPE(unk_token="[UNK]"))
 
         # Set normalizer
         self.tokenizer.normalizer = self.create_vietnamese_normalizer()
@@ -205,110 +206,55 @@ class VietnameseTokenizer:
         trainer = BpeTrainer(
             vocab_size=vocab_size,
             min_frequency=min_frequency,
-            special_tokens=special_tokens,
-            show_progress=True,
-            # Vietnamese alphabet + common patterns
-            initial_alphabet=[
-                "▁",
-                "a",
-                "á",
-                "à",
-                "ả",
-                "ã",
-                "ạ",
-                "â",
-                "ấ",
-                "ầ",
-                "ẩ",
-                "ẫ",
-                "ậ",
-                "ă",
-                "ắ",
-                "ằ",
-                "ẳ",
-                "ẵ",
-                "ặ",
-                "b",
-                "c",
-                "d",
-                "đ",
-                "e",
-                "é",
-                "è",
-                "ẻ",
-                "ẽ",
-                "ẹ",
-                "ê",
-                "ế",
-                "ề",
-                "ể",
-                "ễ",
-                "ệ",
-                "f",
-                "g",
-                "h",
-                "i",
-                "í",
-                "ì",
-                "ỉ",
-                "ĩ",
-                "ị",
-                "j",
-                "k",
-                "l",
-                "m",
-                "n",
-                "o",
-                "ó",
-                "ò",
-                "ỏ",
-                "õ",
-                "ọ",
-                "ô",
-                "ố",
-                "ồ",
-                "ổ",
-                "ỗ",
-                "ộ",
-                "ơ",
-                "ớ",
-                "ờ",
-                "ở",
-                "ỡ",
-                "ợ",
-                "p",
-                "q",
-                "r",
-                "s",
-                "t",
-                "u",
-                "ú",
-                "ù",
-                "ủ",
-                "ũ",
-                "ụ",
-                "ư",
-                "ứ",
-                "ừ",
-                "ử",
-                "ữ",
-                "ự",
-                "v",
-                "w",
-                "x",
-                "y",
-                "ý",
-                "ỳ",
-                "ỷ",
-                "ỹ",
-                "ỵ",
-                "z",
+            special_tokens=[
+                "[PAD]",
+                "[UNK]",
+                "[CLS]",
+                "[SEP]",
+                "[MASK]",
+                "[BOS]",
+                "[EOS]",
+                "[LF]",
             ],
+            initial_alphabet = [
+                "a", "á", "à", "ả", "ã", "ạ",
+                "ă", "ắ", "ằ", "ẳ", "ẵ", "ặ",
+                "â", "ấ", "ầ", "ẩ", "ẫ", "ậ",
+                "b", "c", "d", "đ",
+                "e", "é", "è", "ẻ", "ẽ", "ẹ",
+                "ê", "ế", "ề", "ể", "ễ", "ệ",
+                "g", "h", "i", "í", "ì", "ỉ", "ĩ", "ị",
+                "k", "l", "m", "n",
+                "o", "ó", "ò", "ỏ", "õ", "ọ",
+                "ô", "ố", "ồ", "ổ", "ỗ", "ộ",
+                "ơ", "ớ", "ờ", "ở", "ỡ", "ợ",
+                "p", "q", "r", "s", "t",
+                "u", "ú", "ù", "ủ", "ũ", "ụ",
+                "ư", "ứ", "ừ", "ử", "ữ", "ự",
+                "v", "x", "y", "ý", "ỳ", "ỷ", "ỹ", "ỵ",
+
+                "A", "Á", "À", "Ả", "Ã", "Ạ",
+                "Ă", "Ắ", "Ằ", "Ẳ", "Ẵ", "Ặ",
+                "Â", "Ấ", "Ầ", "Ẩ", "Ẫ", "Ậ",
+                "B", "C", "D", "Đ",
+                "E", "É", "È", "Ẻ", "Ẽ", "Ẹ",
+                "Ê", "Ế", "Ề", "Ể", "Ễ", "Ệ",
+                "G", "H", "I", "Í", "Ì", "Ỉ", "Ĩ", "Ị",
+                "K", "L", "M", "N",
+                "O", "Ó", "Ò", "Ỏ", "Õ", "Ọ",
+                "Ô", "Ố", "Ồ", "Ổ", "Ỗ", "Ộ",
+                "Ơ", "Ớ", "Ờ", "Ở", "Ỡ", "Ợ",
+                "P", "Q", "R", "S", "T",
+                "U", "Ú", "Ù", "Ủ", "Ũ", "Ụ",
+                "Ư", "Ứ", "Ừ", "Ử", "Ữ", "Ự",
+                "V", "X", "Y", "Ý", "Ỳ", "Ỷ", "Ỹ", "Ỵ"
+            ],
+            continuing_subword_prefix="##", 
         )
 
         return trainer
 
-    def train(self, files: List[str], trainer: BpeTrainer):
+    def train(self, files: List[str], trainer: WordPieceTrainer):
         """Train the tokenizer on Vietnamese text files"""
         # Preprocess files before training
         processed_files = []
@@ -320,7 +266,7 @@ class VietnameseTokenizer:
             ) as outfile:
 
                 for line in infile:
-                    cleaned_line = self.preprocess_vietnamese_text(line.strip())
+                    cleaned_line = line
                     if cleaned_line:  # Only write non-empty lines
                         outfile.write(cleaned_line + "\n")
 
@@ -409,8 +355,8 @@ def main():
     print("Training tokenizer...")
     vn_tokenizer.train(train_files, trainer)
 
-    # Setup post-processor
-    vn_tokenizer.setup_post_processor()
+    # # Setup post-processor
+    # vn_tokenizer.setup_post_processor()
 
     # Save tokenizer
     vn_tokenizer.save("vietnamese_enhanced_tokenizer.json")
