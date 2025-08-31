@@ -9,6 +9,7 @@ import torch.nn as nn
 import os
 import argparse
 import json
+import yaml
 from pathlib import Path
 import matplotlib.pyplot as plt
 
@@ -21,38 +22,118 @@ from src.model import VietnameseTransformer
 preprocessor = VietnamesePreprocessor()
 
 
-def setup_training_config():
-    """Setup training configuration"""
-    config = {
+def setup_training_config(config_path: str = "config.yaml"):
+    """Setup training configuration from YAML file"""
+    try:
+        with open(config_path, "r", encoding="utf-8") as f:
+            yaml_config = yaml.safe_load(f)
+
+        # Flatten the nested YAML structure for backward compatibility
+        config = {}
+
         # Data configuration
-        "data_file": "truyen_kieu.txt",
+        config.update(yaml_config.get("data", {}))
+
+        # Model configuration
+        config.update(yaml_config.get("model", {}))
+
+        # Training configuration
+        config.update(yaml_config.get("training", {}))
+
+        # Generation configuration
+        config.update(yaml_config.get("generation", {}))
+
+        # Save configuration
+        config.update(yaml_config.get("save", {}))
+
+        # Convert string values to appropriate types
+        config = convert_config_types(config)
+
+        print(f"✅ Configuration loaded from {config_path}")
+        return config
+
+    except FileNotFoundError:
+        print(f"⚠️  Config file {config_path} not found. Using default configuration.")
+        return get_default_config()
+    except yaml.YAMLError as e:
+        print(f"❌ Error parsing YAML config file: {e}")
+        return get_default_config()
+
+
+def convert_config_types(config):
+    """Convert string values in config to appropriate data types"""
+    type_conversions = {
+        # Data configuration
+        "vocab_size": int,
+        "max_seq_len": int,
+        "train_split": float,
+        # Model configuration
+        "d_model": int,
+        "n_heads": int,
+        "n_layers": int,
+        "d_ff": int,
+        "dropout": float,
+        # Training configuration
+        "batch_size": int,
+        "learning_rate": float,
+        "weight_decay": float,
+        "num_epochs": int,
+        "warmup_steps": int,
+        # Generation configuration
+        "temperature": float,
+        "top_k": int,
+        "top_p": float,
+        "max_new_tokens": int,
+    }
+
+    converted_config = {}
+    for key, value in config.items():
+        if key in type_conversions:
+            try:
+                converted_config[key] = type_conversions[key](value)
+            except (ValueError, TypeError):
+                print(
+                    f"⚠️  Warning: Could not convert {key}={value} to {type_conversions[key].__name__}, keeping as string"
+                )
+                converted_config[key] = value
+        else:
+            # Keep other values as they are (strings, etc.)
+            converted_config[key] = value
+
+    return converted_config
+
+
+def get_default_config():
+    """Return default configuration if YAML file is not available"""
+    return {
+        # Data configuration
+        "data_folder": "data/clean_data",
         "tokenizer_file": "vietnamese_tokenizer.json",
-        "vocab_size": 5000,
-        "max_seq_len": 128,
+        "vocab_size": 25000,
+        "max_seq_len": 512,
         "train_split": 0.8,
         # Model configuration
-        "d_model": 512,
-        "n_heads": 8,
-        "n_layers": 6,
-        "d_ff": 2048,
+        "d_model": 768,
+        "n_heads": 12,
+        "n_layers": 12,
+        "d_ff": 3072,
         "dropout": 0.1,
         # Training configuration
         "batch_size": 16,
-        "learning_rate": 1e-4,
+        "learning_rate": 3e-5,
         "weight_decay": 0.01,
         "num_epochs": 50,
-        "warmup_steps": 1000,
-        "device": "auto",  # 'cuda', 'cpu', or 'auto'
+        "warmup_steps": 5000,
+        "device": "auto",  # 'cuda', 'cpu', 'mps', or 'auto'
         # Generation configuration
         "temperature": 0.8,
-        "top_k": 50,
+        "top_k": 10,
         "top_p": 0.9,
-        "max_new_tokens": 50,
+        "max_new_tokens": 256,
         # Save configuration
         "model_save_path": "vietnamese_transformer_best.pt",
         "config_save_path": "training_config.json",
     }
-    return config
 
 
 def create_sample_data(file_path: str):
