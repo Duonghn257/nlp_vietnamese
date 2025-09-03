@@ -131,7 +131,7 @@ def main():
         max_length=config["max_seq_len"],
         batch_size=config["batch_size"],
     )
-
+    
     print(f"✅ Dataset prepared successfully!")
     print(f"   Training batches: {len(train_loader)}")
     print(f"   Validation batches: {len(val_loader)}")
@@ -167,10 +167,10 @@ def main():
         train_loader=train_loader,
         val_loader=val_loader,
         tokenizer=tokenizer,
-        lr=config["learning_rate"],
-        weight_decay=config["weight_decay"],
-        warmup_steps=config["warmup_steps"],
-        device=config["device"],
+        lr=config['learning_rate'],
+        weight_decay=config['weight_decay'],
+        warmup_steps=config['warmup_steps'],
+        device=config['device']
     )
 
     print(f"✅ Trainer initialized!")
@@ -215,15 +215,15 @@ def main():
         )
         print("Model saved as 'vietnamese_transformer_interrupted.pt'")
 
-    # Step 5: Plot training history
-    if trainer.train_losses and trainer.val_losses:
-        print(f"\n{'='*20} STEP 5: TRAINING ANALYSIS {'='*20}")
-        plot_training_history(trainer.train_losses, trainer.val_losses)
+    # # Step 5: Plot training history
+    # if trainer.train_losses and trainer.val_losses:
+    #     print(f"\n{'='*20} STEP 5: TRAINING ANALYSIS {'='*20}")
+    #     plot_training_history(trainer.train_losses, trainer.val_losses)
 
-        print(f"Training Summary:")
-        print(f"  Best validation loss: {min(trainer.val_losses):.4f}")
-        print(f"  Final training loss: {trainer.train_losses[-1]:.4f}")
-        print(f"  Final validation loss: {trainer.val_losses[-1]:.4f}")
+    #     print(f"Training Summary:")
+    #     print(f"  Best validation loss: {min(trainer.val_losses):.4f}")
+    #     print(f"  Final training loss: {trainer.train_losses[-1]:.4f}")
+    #     print(f"  Final validation loss: {trainer.val_losses[-1]:.4f}")
 
     # Step 6: Final generation test
     print(f"\n{'='*20} STEP 6: FINAL GENERATION TEST {'='*20}")
