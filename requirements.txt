@@ -12,3 +12,6 @@ trl
 wandb
 PyYAML
 streamlit
+loguru
+uvicorn
+fastapi
