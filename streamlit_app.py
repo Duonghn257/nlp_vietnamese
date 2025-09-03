@@ -3,6 +3,7 @@ import json
 from datetime import datetime
 from src import VietnamesePoem
 import os
+import time
 
 # Page configuration
 st.set_page_config(
@@ -81,82 +82,108 @@ with st.sidebar:
     # Device selection
     device = st.selectbox(
         "Device",
-        options=["cpu", "cuda", "mps"],
+        options=["cpu", "cuda"],
         index=0,
-        help="Select the device for model inference",
+        help="Select the device to run the model on",
     )
 
-    # Model initialization
-    if st.button("🚀 Initialize Model"):
-        with st.spinner("Loading model..."):
-            try:
-                st.session_state.poem_generator = VietnamesePoem(
-                    config_path="config.yaml", device=device
-                )
-                st.success("Model loaded successfully!")
-            except Exception as e:
-                st.error(f"Error loading model: {str(e)}")
+    # Streaming option
+    use_streaming = st.checkbox(
+        "Enable Streaming",
+        value=True,
+        help="Enable real-time streaming generation (word by word)",
+    )
 
     st.divider()
 
-    # Conversation management
-    st.header("💾 Conversation")
-
-    if st.button("💾 Save Conversation"):
-        if st.session_state.messages:
-            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-            filename = f"conversation_{timestamp}.json"
-
-            conversation_data = {
-                "timestamp": datetime.now().isoformat(),
-                "messages": st.session_state.messages,
-            }
-
-            with open(filename, "w", encoding="utf-8") as f:
-                json.dump(conversation_data, f, ensure_ascii=False, indent=2)
-
-            st.success(f"Conversation saved to {filename}")
-        else:
-            st.warning("No conversation to save")
-
-    if st.button("🗑️ Clear Conversation"):
+    # Clear chat button
+    if st.button("🗑️ Clear Chat History"):
         st.session_state.messages = []
         st.rerun()
 
-# Main chat interface
+# Initialize model
 if st.session_state.poem_generator is None:
-    st.info("👈 Please initialize the model in the sidebar first!")
-else:
-    # Display chat messages
-    for message in st.session_state.messages:
-        with st.chat_message(message["role"]):
+    with st.spinner("Loading model..."):
+        try:
+            st.session_state.poem_generator = VietnamesePoem(
+                config_path="config.yaml", device=device
+            )
+            st.success("✅ Model loaded successfully!")
+        except Exception as e:
+            st.error(f"❌ Error loading model: {str(e)}")
+
+# Display chat messages
+for message in st.session_state.messages:
+    with st.chat_message(message["role"]):
+        if message["role"] == "user":
+            st.markdown(f"**{message.get('poem_type', '')}**: {message['content']}")
+        else:
             st.markdown(message["content"])
-            if "parameters" in message:
-                poem_type_info = (
-                    f", type={message['parameters']['poem_type']}"
-                    if "poem_type" in message["parameters"]
-                    else ""
+
+# Chat input
+if prompt := st.chat_input("Enter your prompt here..."):
+    # Combine poem type with user prompt
+    full_prompt = f"{poem_type}: {prompt}"
+
+    # Add user message (show original prompt, not the full prompt)
+    st.session_state.messages.append(
+        {
+            "role": "user",
+            "content": prompt,
+            "timestamp": datetime.now().isoformat(),
+            "poem_type": poem_type,
+        }
+    )
+
+    # Display user message
+    with st.chat_message("user"):
+        st.markdown(f"**{poem_type}**: {prompt}")
+
+    # Generate response
+    with st.chat_message("assistant"):
+        if use_streaming:
+            # Streaming generation
+            message_placeholder = st.empty()
+            full_response = ""
+
+            try:
+                for (
+                    text_chunk
+                ) in st.session_state.poem_generator.streaming_generate_poem(
+                    prompt=full_prompt,
+                    max_new_tokens=max_new_tokens,
+                    temperature=temperature,
+                    top_k=top_k,
+                    top_p=top_p,
+                ):
+                    full_response += text_chunk
+                    message_placeholder.markdown(full_response + "▌")
+                    time.sleep(0.05)  # Small delay for better visual effect
+
+                # Final update without cursor
+                message_placeholder.markdown(full_response)
+
+                # Add assistant message to history
+                st.session_state.messages.append(
+                    {
+                        "role": "assistant",
+                        "content": full_response,
+                        "timestamp": datetime.now().isoformat(),
+                        "parameters": {
+                            "max_new_tokens": max_new_tokens,
+                            "temperature": temperature,
+                            "top_k": top_k,
+                            "top_p": top_p,
+                            "poem_type": poem_type,
+                            "streaming": True,
+                        },
+                    }
                 )
-                st.caption(
-                    f"Parameters: tokens={message['parameters']['max_new_tokens']}, temp={message['parameters']['temperature']}{poem_type_info}"
-                )
 
-    # Chat input
-    if prompt := st.chat_input("Enter your prompt here..."):
-        # Combine poem type with user prompt
-        full_prompt = f"{poem_type}: {prompt}"
-
-        # Add user message (show original prompt, not the full prompt)
-        st.session_state.messages.append(
-            {"role": "user", "content": prompt, "timestamp": datetime.now().isoformat()}
-        )
-
-        # Display user message
-        with st.chat_message("user"):
-            st.markdown(f"**{poem_type}**: {prompt}")
-
-        # Generate response
-        with st.chat_message("assistant"):
+            except Exception as e:
+                st.error(f"❌ Error during streaming generation: {str(e)}")
+        else:
+            # Non-streaming generation
             with st.spinner("Generating poem..."):
                 try:
                     response = st.session_state.poem_generator.generate_poem(
@@ -181,30 +208,35 @@ else:
                                 "top_k": top_k,
                                 "top_p": top_p,
                                 "poem_type": poem_type,
+                                "streaming": False,
                             },
                         }
                     )
 
                 except Exception as e:
-                    error_msg = f"Error generating response: {str(e)}"
-                    st.error(error_msg)
-                    st.session_state.messages.append(
-                        {
-                            "role": "assistant",
-                            "content": error_msg,
-                            "timestamp": datetime.now().isoformat(),
-                        }
-                    )
+                    st.error(f"❌ Error generating poem: {str(e)}")
 
-# Footer
-st.divider()
-st.markdown("---")
-st.markdown(
-    """
-    <div style='text-align: center; color: #666;'>
-        <p>Vietnamese Poem Generator Chat App</p>
-        <p>Built with Streamlit and Vietnamese NLP</p>
-    </div>
-    """,
-    unsafe_allow_html=True,
-)
+# Display chat statistics in sidebar
+if st.session_state.messages:
+    st.sidebar.divider()
+    st.sidebar.header("📊 Chat Statistics")
+    st.sidebar.metric("Total Messages", len(st.session_state.messages))
+
+    user_messages = len([m for m in st.session_state.messages if m["role"] == "user"])
+    assistant_messages = len(
+        [m for m in st.session_state.messages if m["role"] == "assistant"]
+    )
+
+    st.sidebar.metric("User Messages", user_messages)
+    st.sidebar.metric("AI Responses", assistant_messages)
+
+    if assistant_messages > 0:
+        streaming_count = len(
+            [
+                m
+                for m in st.session_state.messages
+                if m["role"] == "assistant"
+                and m.get("parameters", {}).get("streaming", False)
+            ]
+        )
+        st.sidebar.metric("Streaming Responses", streaming_count)

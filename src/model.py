@@ -374,3 +374,134 @@ class VietnameseTransformer(nn.Module):
                     break
 
         return generated_tokens
+
+    def streaming_generate(
+        self,
+        input_ids: torch.Tensor,
+        max_new_tokens: int = 50,
+        temperature: float = 1.0,
+        top_k: int = 50,
+        top_p: float = 0.9,
+        do_sample: bool = True,
+        pad_token_id: int = 0,
+        eos_token_id: int = 3,
+    ):
+        """Streaming generation that yields tokens one by one"""
+
+        self.eval()
+        device = input_ids.device
+        batch_size = input_ids.shape[0]
+
+        generated_tokens = input_ids.clone()
+
+        with torch.no_grad():
+            for step in range(max_new_tokens):
+                # Truncate sequence if it gets too long (prevent memory issues)
+                if generated_tokens.size(1) > 512:
+                    generated_tokens = generated_tokens[:, -256:]
+
+                # Forward pass
+                logits, _ = self.forward(generated_tokens, return_loss=False)
+
+                # Get logits for last position
+                next_token_logits = logits[:, -1, :].clone()
+
+                # Apply temperature (avoid division by zero)
+                if temperature != 1.0 and temperature > 0:
+                    next_token_logits = next_token_logits / max(temperature, 1e-8)
+
+                # Clamp logits to prevent extreme values
+                next_token_logits = torch.clamp(next_token_logits, min=-50, max=50)
+
+                # Apply top-k filtering
+                if top_k > 0 and top_k < next_token_logits.size(-1):
+                    top_k_actual = min(top_k, next_token_logits.size(-1))
+                    top_k_logits, top_k_indices = torch.topk(
+                        next_token_logits, top_k_actual
+                    )
+                    # Create mask for top-k tokens
+                    top_k_mask = torch.zeros_like(next_token_logits, dtype=torch.bool)
+                    top_k_mask.scatter_(-1, top_k_indices, True)
+                    # Set non-top-k tokens to very low value (not -inf to avoid numerical issues)
+                    next_token_logits = next_token_logits.masked_fill(
+                        ~top_k_mask, -50.0
+                    )
+
+                # Apply top-p (nucleus) filtering
+                if top_p < 1.0:
+                    sorted_logits, sorted_indices = torch.sort(
+                        next_token_logits, descending=True
+                    )
+                    # Use stable softmax
+                    sorted_logits = (
+                        sorted_logits - sorted_logits.max(dim=-1, keepdim=True)[0]
+                    )
+                    sorted_probs = F.softmax(sorted_logits, dim=-1)
+                    cumulative_probs = torch.cumsum(sorted_probs, dim=-1)
+
+                    # Remove tokens with cumulative probability above the threshold
+                    sorted_indices_to_remove = cumulative_probs > top_p
+                    # Shift the indices to the right to keep the first token above the threshold
+                    sorted_indices_to_remove[..., 1:] = sorted_indices_to_remove[
+                        ..., :-1
+                    ].clone()
+                    sorted_indices_to_remove[..., 0] = 0
+
+                    # Convert back to original indices
+                    indices_to_remove = sorted_indices_to_remove.scatter(
+                        1, sorted_indices, sorted_indices_to_remove
+                    )
+                    next_token_logits = next_token_logits.masked_fill(
+                        indices_to_remove, -50.0
+                    )
+
+                # Final clamp before softmax
+                next_token_logits = torch.clamp(next_token_logits, min=-50, max=50)
+
+                # Sample or greedy decode
+                if do_sample:
+                    # Use stable softmax
+                    next_token_logits = (
+                        next_token_logits
+                        - next_token_logits.max(dim=-1, keepdim=True)[0]
+                    )
+                    probs = F.softmax(next_token_logits, dim=-1)
+
+                    # Check for valid probabilities
+                    if (
+                        torch.isnan(probs).any()
+                        or torch.isinf(probs).any()
+                        or (probs < 0).any()
+                    ):
+                        print(
+                            f"Warning: Invalid probabilities at step {step}, using greedy decoding"
+                        )
+                        next_tokens = torch.argmax(
+                            next_token_logits, dim=-1, keepdim=True
+                        )
+                    else:
+                        # Add small epsilon to prevent all-zero probabilities
+                        probs = probs + 1e-8
+                        probs = probs / probs.sum(dim=-1, keepdim=True)
+                        try:
+                            next_tokens = torch.multinomial(probs, num_samples=1)
+                        except RuntimeError as e:
+                            print(
+                                f"Warning: Multinomial sampling failed at step {step}: {e}"
+                            )
+                            print(f"Using greedy decoding instead")
+                            next_tokens = torch.argmax(
+                                next_token_logits, dim=-1, keepdim=True
+                            )
+                else:
+                    next_tokens = torch.argmax(next_token_logits, dim=-1, keepdim=True)
+
+                # Yield the next token
+                yield next_tokens[0].item()  # Return single token for first batch item
+
+                # Append to generated sequence
+                generated_tokens = torch.cat([generated_tokens, next_tokens], dim=-1)
+
+                # Stop if EOS token is generated
+                if (next_tokens == eos_token_id).any():
+                    break

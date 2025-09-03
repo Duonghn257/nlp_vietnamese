@@ -2,7 +2,7 @@ from .tokenizer import VietnameseTokenizer, VietnamesePreprocessor
 from .model import VietnameseTransformer
 from .helpers import setup_training_config
 import torch
-from typing import Text
+from typing import Text, Generator
 
 
 class VietnamesePoem:
@@ -84,3 +84,66 @@ class VietnamesePoem:
             .replace("[LF]", """\n""")
             .replace("[EOS]", "")
         )
+
+    def streaming_generate_poem(
+        self,
+        prompt: str,
+        max_new_tokens: int = 100,
+        temperature: float = 0.8,
+        top_k: int = 50,
+        top_p: float = 0.9,
+    ) -> Generator[str, None, None]:
+        """Streaming generation that yields text chunks token by token"""
+        self.model.eval()
+        self.model.to(self.device)
+
+        prompt = self.preprocessor.clean_text(prompt)
+        prompt = self.preprocessor.word_segment(prompt)
+
+        input_ids = torch.tensor(
+            [self.tokenizer.encode(prompt, add_special_tokens=False).ids]
+        ).to(self.device)
+
+        # Get the original prompt tokens to skip them in output
+        original_length = input_ids.size(1)
+
+        # Track generated tokens and last yielded text
+        generated_tokens = []
+        last_yielded_text = ""
+
+        # Process each token as it's generated
+        for token_id in self.model.streaming_generate(
+            input_ids,
+            max_new_tokens,
+            temperature,
+            top_k,
+            top_p,
+            pad_token_id=self.tokenizer.token_to_id("[PAD]"),
+            eos_token_id=self.tokenizer.token_to_id("[EOS]"),
+        ):
+            # Add the new token to our list
+            generated_tokens.append(token_id)
+
+            # Skip if we're still in the original prompt
+            if len(generated_tokens) <= original_length:
+                continue
+
+            # Decode the entire sequence so far
+            current_text = self.tokenizer.decode(
+                generated_tokens, skip_special_tokens=False
+            )
+
+            # Clean up the text
+            current_text = (
+                current_text.replace(" ##", "")
+                .replace("_", " ")
+                .replace("[LF]", "\n")
+                .replace("[EOS]", "")
+            )
+
+            # Find new content since last yield
+            if len(current_text) > len(last_yielded_text):
+                new_content = current_text[len(last_yielded_text) :]
+                if new_content.strip():  # Only yield non-empty content
+                    yield new_content
+                    last_yielded_text = current_text
