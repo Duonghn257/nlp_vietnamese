@@ -1,0 +1,470 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Vietnamese Poem Generator</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1000px;
+            margin: 0 auto;
+            background: rgba(255, 255, 255, 0.95);
+            border-radius: 20px;
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.1);
+            overflow: hidden;
+        }
+
+        .header {
+            background: linear-gradient(135deg, #ff6b6b, #ee5a24);
+            color: white;
+            padding: 30px;
+            text-align: center;
+        }
+
+        .header h1 {
+            font-size: 2.5em;
+            margin-bottom: 10px;
+            text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.3);
+        }
+
+        .header p {
+            font-size: 1.2em;
+            opacity: 0.9;
+        }
+
+        .content {
+            display: flex;
+            min-height: 600px;
+        }
+
+        .sidebar {
+            width: 300px;
+            background: #f8f9fa;
+            padding: 25px;
+            border-right: 1px solid #dee2e6;
+        }
+
+        .main-area {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .conversation {
+            flex: 1;
+            padding: 25px;
+            overflow-y: auto;
+            max-height: 500px;
+        }
+
+        .input-area {
+            padding: 25px;
+            border-top: 1px solid #dee2e6;
+            background: #f8f9fa;
+        }
+
+        .form-group {
+            margin-bottom: 20px;
+        }
+
+        .form-group label {
+            display: block;
+            margin-bottom: 8px;
+            font-weight: 600;
+            color: #333;
+        }
+
+        .form-group select,
+        .form-group input,
+        .form-group textarea {
+            width: 100%;
+            padding: 12px;
+            border: 2px solid #dee2e6;
+            border-radius: 8px;
+            font-size: 14px;
+            transition: all 0.3s ease;
+        }
+
+        .form-group select:focus,
+        .form-group input:focus,
+        .form-group textarea:focus {
+            outline: none;
+            border-color: #667eea;
+            box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+        }
+
+        .parameters-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 15px;
+        }
+
+        .message {
+            margin-bottom: 20px;
+            padding: 20px;
+            border-radius: 15px;
+            animation: fadeIn 0.5s ease;
+        }
+
+        .message.user {
+            background: linear-gradient(135deg, #667eea, #764ba2);
+            color: white;
+            margin-left: 50px;
+        }
+
+        .message.assistant {
+            background: linear-gradient(135deg, #f093fb, #f5576c);
+            color: white;
+            margin-right: 50px;
+        }
+
+        .message-header {
+            font-weight: bold;
+            margin-bottom: 10px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .message-content {
+            line-height: 1.6;
+            white-space: pre-wrap;
+        }
+
+        .generate-btn {
+            background: linear-gradient(135deg, #ff6b6b, #ee5a24);
+            color: white;
+            border: none;
+            padding: 15px 30px;
+            border-radius: 25px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            width: 100%;
+            margin-top: 15px;
+        }
+
+        .generate-btn:hover:not(:disabled) {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 25px rgba(255, 107, 107, 0.3);
+        }
+
+        .generate-btn:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+        }
+
+        .clear-btn {
+            background: linear-gradient(135deg, #6c757d, #495057);
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 20px;
+            font-size: 14px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            width: 100%;
+            margin-bottom: 20px;
+        }
+
+        .clear-btn:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 5px 15px rgba(108, 117, 125, 0.3);
+        }
+
+        .loading {
+            display: none;
+            text-align: center;
+            padding: 20px;
+            color: #666;
+        }
+
+        .loading.show {
+            display: block;
+        }
+
+        .spinner {
+            border: 3px solid #f3f3f3;
+            border-top: 3px solid #667eea;
+            border-radius: 50%;
+            width: 30px;
+            height: 30px;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 10px;
+        }
+
+        .empty-state {
+            text-align: center;
+            padding: 60px 20px;
+            color: #666;
+        }
+
+        .empty-state h3 {
+            margin-bottom: 10px;
+            color: #333;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(20px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        @media (max-width: 768px) {
+            .content {
+                flex-direction: column;
+            }
+            
+            .sidebar {
+                width: 100%;
+            }
+            
+            .parameters-grid {
+                grid-template-columns: 1fr;
+            }
+            
+            .message.user {
+                margin-left: 20px;
+            }
+            
+            .message.assistant {
+                margin-right: 20px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🌸 Vietnamese Poem Generator</h1>
+            <p>Create beautiful Vietnamese poetry with AI</p>
+        </div>
+        
+        <div class="content">
+            <div class="sidebar">
+                <button class="clear-btn" onclick="clearConversation()">🗑️ Clear History</button>
+                
+                <div class="form-group">
+                    <label for="poetryType">Poetry Type:</label>
+                    <select id="poetryType">
+                        <option value="thơ bốn chữ">thơ bón chữ</option>
+                        <option value="thơ bảy chữ" selected>thơ bảy chữ</option>
+                        <option value="thơ lục bát">thơ lục bát</option>
+                        <option value="thơ tám chữ">thơ tám chữ</option>
+                        <option value="thơ năm chữ">thơ năm chữ</option>
+                    </select>
+                </div>
+
+                <div class="form-group">
+                    <label>Generation Parameters:</label>
+                    <div class="parameters-grid">
+                        <div>
+                            <label for="maxTokens">Max Tokens:</label>
+                            <input type="number" id="maxTokens" value="100" min="10" max="500">
+                        </div>
+                        <div>
+                            <label for="temperature">Temperature:</label>
+                            <input type="number" id="temperature" value="0.8" min="0.1" max="2" step="0.1">
+                        </div>
+                        <div>
+                            <label for="topK">Top K:</label>
+                            <input type="number" id="topK" value="50" min="1" max="100">
+                        </div>
+                        <div>
+                            <label for="topP">Top P:</label>
+                            <input type="number" id="topP" value="0.9" min="0.1" max="1" step="0.1">
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="main-area">
+                <div class="conversation" id="conversation">
+                    <div class="empty-state">
+                        <h3>Welcome to Vietnamese Poem Generator!</h3>
+                        <p>Start by entering a prompt below to generate your first poem.</p>
+                    </div>
+                </div>
+
+                <div class="loading" id="loading">
+                    <div class="spinner"></div>
+                    <p>Generating your poem...</p>
+                </div>
+
+                <div class="input-area">
+                    <div class="form-group">
+                        <label for="prompt">Enter your prompt:</label>
+                        <textarea id="prompt" rows="3" placeholder="Enter your poem inspiration here..."></textarea>
+                    </div>
+                    <button class="generate-btn" onclick="generatePoem()" id="generateBtn">
+                        ✨ Generate Poem
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // API configuration
+        const API_BASE_URL = 'http://localhost:8000';
+        
+        // Conversation history
+        let conversationHistory = [];
+
+        // DOM elements
+        const conversation = document.getElementById('conversation');
+        const promptInput = document.getElementById('prompt');
+        const generateBtn = document.getElementById('generateBtn');
+        const loading = document.getElementById('loading');
+
+        // Initialize
+        document.addEventListener('DOMContentLoaded', function() {
+            // Remove the duplicate event listener here
+        });
+
+        async function generatePoem() {
+            const prompt = promptInput.value.trim();
+            if (!prompt) {
+                alert('Please enter a prompt!');
+                return;
+            }
+
+            const poetryType = document.getElementById('poetryType').value;
+            const maxTokens = parseInt(document.getElementById('maxTokens').value);
+            const temperature = parseFloat(document.getElementById('temperature').value);
+            const topK = parseInt(document.getElementById('topK').value);
+            const topP = parseFloat(document.getElementById('topP').value);
+
+            // Add poetry type prefix to prompt
+            const fullPrompt = `${poetryType} :${prompt}`;
+
+            // Add user message to conversation
+            addMessage('user', prompt, poetryType);
+            
+            // Clear input
+            promptInput.value = '';
+            
+            // Show loading
+            showLoading(true);
+            
+            try {
+                const response = await fetch(`${API_BASE_URL}/generate`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        prompt: fullPrompt,
+                        max_new_tokens: maxTokens,
+                        temperature: temperature,
+                        top_k: topK,
+                        top_p: topP
+                    })
+                });
+
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+
+                const data = await response.json();
+                
+                // Add assistant response to conversation
+                addMessage('assistant', data.generated_text);
+                
+            } catch (error) {
+                console.error('Error:', error);
+                addMessage('assistant', 'Sorry, there was an error generating the poem. Please check if the API server is running and try again.');
+            } finally {
+                showLoading(false);
+            }
+        }
+
+        function addMessage(role, content, poetryType = null) {
+            // Remove empty state if it exists
+            const emptyState = conversation.querySelector('.empty-state');
+            if (emptyState) {
+                emptyState.remove();
+            }
+
+            const messageDiv = document.createElement('div');
+            messageDiv.className = `message ${role}`;
+            
+            const headerDiv = document.createElement('div');
+            headerDiv.className = 'message-header';
+            
+            if (role === 'user') {
+                headerDiv.innerHTML = `<span>🧑‍💻 You</span>${poetryType ? `<span style="opacity: 0.7; font-size: 0.9em;">(${poetryType})</span>` : ''}`;
+            } else {
+                headerDiv.innerHTML = '<span>🤖 AI Poet</span>';
+            }
+            
+            const contentDiv = document.createElement('div');
+            contentDiv.className = 'message-content';
+            contentDiv.textContent = content;
+            
+            messageDiv.appendChild(headerDiv);
+            messageDiv.appendChild(contentDiv);
+            
+            conversation.appendChild(messageDiv);
+            
+            // Add to history
+            conversationHistory.push({ role, content, poetryType });
+            
+            // Scroll to bottom
+            conversation.scrollTop = conversation.scrollHeight;
+        }
+
+        function showLoading(show) {
+            loading.classList.toggle('show', show);
+            generateBtn.disabled = show;
+            
+            if (show) {
+                generateBtn.textContent = 'Generating...';
+            } else {
+                generateBtn.textContent = '✨ Generate Poem';
+            }
+        }
+
+        function clearConversation() {
+            if (conversationHistory.length === 0) return;
+            
+            if (confirm('Are you sure you want to clear the conversation history?')) {
+                conversationHistory = [];
+                conversation.innerHTML = `
+                    <div class="empty-state">
+                        <h3>Welcome to Vietnamese Poem Generator!</h3>
+                        <p>Start by entering a prompt below to generate your first poem.</p>
+                    </div>
+                `;
+            }
+        }
+
+        // Handle Enter key in prompt - single event listener
+        document.getElementById('prompt').addEventListener('keydown', function(e) {
+            if (e.key === 'Enter' && !e.shiftKey) {
+                e.preventDefault();
+                e.stopPropagation();
+                generatePoem();
+            }
+        });
+    </script>
+</body>
+</html>

@@ -11,10 +11,10 @@ class VietnamesePoem:
         config_path: str = "config.yaml",
         device: str = "cuda",
     ):
-        self.model, self.tokenizer = VietnamesePoem.load_model_config(config_path)
+        self.device = device
+        self.model, self.tokenizer = self.load_model_config(config_path)
         self.preprocessor = VietnamesePreprocessor()
         self.config_path = config_path
-        self.device = device
 
     @staticmethod
     def load_tokenizer(tokenizer_path: str) -> VietnameseTokenizer:
@@ -22,8 +22,8 @@ class VietnamesePoem:
         tokenizer.load(tokenizer_path)
         return tokenizer.tokenizer
 
-    @staticmethod
     def load_model_config(
+        self,
         config_path: str = "config.yaml",
     ) -> tuple[VietnameseTransformer, VietnameseTokenizer]:
         config = setup_training_config(config_path=config_path)
@@ -39,6 +39,12 @@ class VietnamesePoem:
             dropout=config["dropout"],
             pad_token_id=tokenizer.token_to_id("[PAD]"),
         )
+
+        checkpoint = torch.load(
+            config["model_save_path"], map_location=self.device, weights_only=False
+        )
+        model.load_state_dict(checkpoint["model_state_dict"])
+        print("✅ Loaded best model for testing")
 
         return model, tokenizer
 
@@ -69,5 +75,12 @@ class VietnamesePoem:
             pad_token_id=self.tokenizer.token_to_id("[PAD]"),
             eos_token_id=self.tokenizer.token_to_id("[EOS]"),
         )
-        generated_text = self.tokenizer.decode(generated_tokens[0].cpu().tolist())
-        return generated_text.replace(" ##", "").replace("_", " ").replace("[LF]", "\n")
+        generated_text = self.tokenizer.decode(
+            generated_tokens[0].cpu().tolist(), skip_special_tokens=False
+        )
+        return (
+            generated_text.replace(" ##", "")
+            .replace("_", " ")
+            .replace("[LF]", """\n""")
+            .replace("[EOS]", "")
+        )
