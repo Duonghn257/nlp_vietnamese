@@ -138,6 +138,51 @@ streamlit run streamlit_app.py
 4. View the generated poem response
 5. Save your conversation when finished
 
+### Web Interface (Backend + Frontend)
+
+For a more advanced web interface with streaming generation, you can run both the backend API and frontend server:
+
+#### 1. Start the Backend API Server
+
+First, start the FastAPI backend server:
+
+```bash
+python generation_api.py
+```
+
+The backend will be available at `http://localhost:8000`
+
+#### 2. Start the Frontend Server
+
+In a new terminal, start the frontend server:
+
+```bash
+python serve_frontend.py
+```
+
+The frontend will be available at `http://localhost:3000`
+
+#### 3. Access the Web Interface
+
+1. Open your browser and go to `http://localhost:3000`
+2. The interface will automatically connect to the backend API
+3. Enter your poem prompt and adjust generation parameters
+4. Watch the poem generate in real-time with streaming
+
+#### Web Interface Features:
+- **Real-time Streaming**: See the poem generate word by word
+- **Modern UI**: Beautiful, responsive interface
+- **Parameter Controls**: Adjust generation parameters in real-time
+- **Poetry Types**: Select different Vietnamese poetry styles
+- **Conversation History**: Keep track of all generated poems
+- **Mobile Responsive**: Works on desktop and mobile devices
+
+#### Troubleshooting:
+- Make sure both servers are running simultaneously
+- Check that ports 8000 and 3000 are available
+- If the frontend can't connect to the backend, check the API URL in `index.html`
+- For CORS issues, ensure the backend CORS settings are correct
+
 ### Custom Configuration
 
 Create a custom configuration file:
@@ -162,6 +207,11 @@ nlp_vietnamese/
 ├── config.yaml              # Main configuration file
 ├── main.py                  # Main training script
 ├── requirements.txt          # Python dependencies
+├── generation_api.py        # FastAPI backend server
+├── serve_frontend.py        # Frontend server
+├── index.html              # Frontend interface
+├── streamlit_app.py        # Streamlit chat interface
+├── run_app.py              # Streamlit app runner
 ├── src/
 │   ├── __init__.py
 │   ├── tokenizer.py         # Vietnamese tokenizer
@@ -169,6 +219,7 @@ nlp_vietnamese/
 │   ├── dataset.py          # Dataset handling
 │   ├── trainer.py          # Training pipeline
 │   ├── helpers.py          # Utility functions
+│   ├── chat.py             # Poem generation interface
 │   └── word_piece.py       # WordPiece tokenizer
 ├── data/                    # Training data (ignored by git)
 ├── notebooks1/             # Jupyter notebooks
