@@ -13,19 +13,21 @@
 
         body {
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
-            min-height: 100vh;
-            padding: 20px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            height: 100vh;
+            padding: 40px;
         }
 
         .container {
             max-width: 1000px;
-            margin: 0 auto;
+            margin: auto auto;
             background: rgba(30, 30, 46, 0.95);
             border-radius: 20px;
             box-shadow: 0 20px 40px rgba(0, 0, 0, 0.3);
             overflow: hidden;
             border: 1px solid #444;
+            height: 100%;
+
         }
 
         .header {
@@ -72,6 +74,32 @@
             overflow-y: auto;
             max-height: 500px;
             background: #1e1e2e;
+        }
+
+        /* Custom scrollbar for conversation */
+        .conversation::-webkit-scrollbar {
+            width: 8px;
+        }
+
+        .conversation::-webkit-scrollbar-track {
+            background: #2a2a3e;
+            border-radius: 10px;
+        }
+
+        .conversation::-webkit-scrollbar-thumb {
+            background: linear-gradient(135deg, #667eea, #764ba2);
+            border-radius: 10px;
+            border: 2px solid #2a2a3e;
+        }
+
+        .conversation::-webkit-scrollbar-thumb:hover {
+            background: linear-gradient(135deg, #5a6fd8, #6a4190);
+        }
+
+        /* Firefox scrollbar */
+        .conversation {
+            scrollbar-width: thin;
+            scrollbar-color: #667eea #2a2a3e;
         }
 
         .input-area {
