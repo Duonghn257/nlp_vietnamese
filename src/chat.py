@@ -2,6 +2,7 @@ from .tokenizer import VietnameseTokenizer, VietnamesePreprocessor
 from .model import VietnameseTransformer
 from .helpers import setup_training_config
 import torch
+import re
 from typing import Text, Generator
 
 
@@ -83,6 +84,7 @@ class VietnamesePoem:
             .replace("_", " ")
             .replace("[LF]", """\n""")
             .replace("[EOS]", "")
+            .lstrip()
         )
 
     def streaming_generate_poem(
@@ -139,7 +141,11 @@ class VietnamesePoem:
                 .replace("_", " ")
                 .replace("[LF]", "\n")
                 .replace("[EOS]", "")
+                .lstrip()
             )
+
+            # Remove leading spaces after line breaks
+            current_text = re.sub(r"\n\s+", "\n", current_text)
 
             # Find new content since last yield
             if len(current_text) > len(last_yielded_text):

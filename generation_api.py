@@ -61,7 +61,6 @@ async def generate_text_stream(request: GenerateRequest):
 
     async def generate_stream():
         try:
-            chunk_count = 0
             for text_chunk in poem_generator.streaming_generate_poem(
                 prompt=request.prompt,
                 max_new_tokens=request.max_new_tokens,
@@ -69,18 +68,10 @@ async def generate_text_stream(request: GenerateRequest):
                 top_k=request.top_k,
                 top_p=request.top_p,
             ):
-                chunk_count += 1
-                print(f"API: Yielding chunk {chunk_count}: '{text_chunk}'")  # Debug
-
-                # Send each chunk as a Server-Sent Event
                 data = json.dumps({"chunk": text_chunk, "type": "content"})
                 yield f"data: {data}\n\n"
+                await asyncio.sleep(0)
 
-                # Add a small delay to make streaming visible
-                # await asyncio.sleep(0.1)
-
-            print(f"API: Completed streaming with {chunk_count} chunks")  # Debug
-            # Send completion signal
             done_data = json.dumps({"chunk": "", "type": "done"})
             yield f"data: {done_data}\n\n"
 
@@ -92,11 +83,11 @@ async def generate_text_stream(request: GenerateRequest):
 
     return StreamingResponse(
         generate_stream(),
-        media_type="text/event-stream",  # ✅ Sửa ở đây
+        media_type="text/event-stream",
         headers={
             "Cache-Control": "no-cache",
             "Connection": "keep-alive",
-            "Content-Type": "text/event-stream",  # ✅ Đảm bảo Content-Type đúng
+            "Content-Type": "text/event-stream",
             "Transfer-Encoding": "chunked",
         },
     )

@@ -16,15 +16,14 @@
             background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
             min-height: 100vh;
             padding: 20px;
-            color: #e0e0e0;
         }
 
         .container {
             max-width: 1000px;
             margin: 0 auto;
-            background: rgba(30, 30, 30, 0.95);
+            background: rgba(30, 30, 46, 0.95);
             border-radius: 20px;
-            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.4);
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.3);
             overflow: hidden;
             border: 1px solid #444;
         }
@@ -55,7 +54,7 @@
 
         .sidebar {
             width: 300px;
-            background: #2a2a2a;
+            background: #2a2a3e;
             padding: 25px;
             border-right: 1px solid #444;
         }
@@ -64,7 +63,7 @@
             flex: 1;
             display: flex;
             flex-direction: column;
-            background: #1e1e1e;
+            background: #1e1e2e;
         }
 
         .conversation {
@@ -72,13 +71,13 @@
             padding: 25px;
             overflow-y: auto;
             max-height: 500px;
-            background: #1e1e1e;
+            background: #1e1e2e;
         }
 
         .input-area {
             padding: 25px;
             border-top: 1px solid #444;
-            background: #2a2a2a;
+            background: #2a2a3e;
         }
 
         .form-group {
@@ -101,7 +100,7 @@
             border-radius: 8px;
             font-size: 14px;
             transition: all 0.3s ease;
-            background: #333;
+            background: #1a1a2e;
             color: #e0e0e0;
         }
 
@@ -110,12 +109,7 @@
         .form-group textarea:focus {
             outline: none;
             border-color: #667eea;
-            box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.2);
-        }
-
-        .form-group select option {
-            background: #333;
-            color: #e0e0e0;
+            box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
         }
 
         .parameters-grid {
@@ -135,7 +129,6 @@
             background: linear-gradient(135deg, #4a5568, #2d3748);
             color: #e0e0e0;
             margin-left: 50px;
-            border: 1px solid #555;
         }
 
         .message.assistant {
@@ -169,13 +162,11 @@
             display: flex;
             align-items: center;
             gap: 10px;
-            color: #f0f0f0;
         }
 
         .message-content {
             line-height: 1.6;
             white-space: pre-wrap;
-            color: #e0e0e0;
         }
 
         .generate-btn {
@@ -203,7 +194,7 @@
         }
 
         .clear-btn {
-            background: linear-gradient(135deg, #4a5568, #2d3748);
+            background: linear-gradient(135deg, #6c757d, #495057);
             color: white;
             border: none;
             padding: 10px 20px;
@@ -213,20 +204,18 @@
             transition: all 0.3s ease;
             width: 100%;
             margin-bottom: 20px;
-            border: 1px solid #555;
         }
 
         .clear-btn:hover {
             transform: translateY(-1px);
-            box-shadow: 0 5px 15px rgba(74, 85, 104, 0.3);
-            background: linear-gradient(135deg, #5a6578, #3d4758);
+            box-shadow: 0 5px 15px rgba(108, 117, 125, 0.3);
         }
 
         .loading {
             display: none;
             text-align: center;
             padding: 20px;
-            color: #b0b0b0;
+            color: #ccc;
         }
 
         .loading.show {
@@ -246,7 +235,7 @@
         .empty-state {
             text-align: center;
             padding: 60px 20px;
-            color: #b0b0b0;
+            color: #ccc;
         }
 
         .empty-state h3 {
@@ -301,11 +290,11 @@
                 <div class="form-group">
                     <label for="poetryType">Poetry Type:</label>
                     <select id="poetryType">
-                        <option value="thơ bốn chữ">thơ bón chữ</option>
-                        <option value="thơ bảy chữ" selected>thơ bảy chữ</option>
-                        <option value="thơ lục bát">thơ lục bát</option>
-                        <option value="thơ tám chữ">thơ tám chữ</option>
-                        <option value="thơ năm chữ">thơ năm chữ</option>
+                        <option value="thơ bốn chữ">Thơ bốn chữ</option>
+                        <option value="thơ bảy chữ" selected>Thơ bảy chữ</option>
+                        <option value="thơ lục bát">Thơ lục bát</option>
+                        <option value="thơ tám chữ">Thơ tám chữ</option>
+                        <option value="thơ năm chữ">Thơ năm chữ</option>
                     </select>
                 </div>
 
@@ -372,6 +361,15 @@
         const generateBtn = document.getElementById('generateBtn');
         const loading = document.getElementById('loading');
 
+        // Initialize
+        document.addEventListener('DOMContentLoaded', function() {
+            promptInput.addEventListener('keydown', function(e) {
+                if (e.key === 'Enter' && e.ctrlKey) {
+                    generatePoem();
+                }
+            });
+        });
+
         async function generatePoem() {
             if (isGenerating) return;
             
@@ -403,8 +401,8 @@
             
             try {
                 // Create assistant message for streaming
-                const assistantMessage = addMessage('assistant', '', null, true);
-                let fullResponse = '';
+                const assistantMessage = addMessage('assistant', prompt + ' ', null, true);
+                let fullResponse = prompt + ' ';
                 
                 // Make streaming request
                 const response = await fetch(`${API_BASE_URL}/generate/stream`, {
@@ -522,6 +520,7 @@
             return messageDiv;
         }
 
+
         function clearConversation() {
             if (conversationHistory.length === 0) return;
             
@@ -540,7 +539,6 @@
         document.getElementById('prompt').addEventListener('keydown', function(e) {
             if (e.key === 'Enter' && !e.shiftKey) {
                 e.preventDefault();
-                e.stopPropagation();
                 generatePoem();
             }
         });
