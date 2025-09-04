@@ -1,9 +1,13 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 from src import VietnamesePoem
 from typing import Optional
 import uvicorn
+import json
+import asyncio
+
 
 app = FastAPI(title="Vietnamese Poem Generator API", version="1.0.0")
 
@@ -49,6 +53,44 @@ async def generate_text(request: GenerateRequest):
     )
 
     return GenerateResponse(generated_text=generated_text)
+
+
+@app.post("/generate/stream")
+async def generate_text_stream(request: GenerateRequest):
+    """Streaming endpoint that generates text word by word"""
+
+    async def generate_stream():
+        try:
+            for text_chunk in poem_generator.streaming_generate_poem(
+                prompt=request.prompt,
+                max_new_tokens=request.max_new_tokens,
+                temperature=request.temperature,
+                top_k=request.top_k,
+                top_p=request.top_p,
+            ):
+                data = json.dumps({"chunk": text_chunk, "type": "content"})
+                yield f"data: {data}\n\n"
+                await asyncio.sleep(0)
+
+            done_data = json.dumps({"chunk": "", "type": "done"})
+            yield f"data: {done_data}\n\n"
+
+        except Exception as e:
+            print(f"API: Error during streaming: {e}")  # Debug
+            # Send error signal
+            error_data = json.dumps({"chunk": str(e), "type": "error"})
+            yield f"data: {error_data}\n\n"
+
+    return StreamingResponse(
+        generate_stream(),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "Connection": "keep-alive",
+            "Content-Type": "text/event-stream",
+            "Transfer-Encoding": "chunked",
+        },
+    )
 
 
 if __name__ == "__main__":

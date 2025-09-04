@@ -183,3 +183,7 @@ test/
 *.json
 10000books/
 *.zip
+*test*.py
+test*.py
+*test.py
+test_streaming.py

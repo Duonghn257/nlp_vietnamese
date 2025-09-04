@@ -13,7 +13,7 @@
 
         body {
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
             min-height: 100vh;
             padding: 20px;
         }
@@ -21,17 +21,19 @@
         .container {
             max-width: 1000px;
             margin: 0 auto;
-            background: rgba(255, 255, 255, 0.95);
+            background: rgba(30, 30, 46, 0.95);
             border-radius: 20px;
-            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.1);
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.3);
             overflow: hidden;
+            border: 1px solid #444;
         }
 
         .header {
-            background: linear-gradient(135deg, #ff6b6b, #ee5a24);
+            background: linear-gradient(135deg, #2a2a2a, #1e1e1e);
             color: white;
             padding: 30px;
             text-align: center;
+            border-bottom: 1px solid #444;
         }
 
         .header h1 {
@@ -52,15 +54,16 @@
 
         .sidebar {
             width: 300px;
-            background: #f8f9fa;
+            background: #2a2a3e;
             padding: 25px;
-            border-right: 1px solid #dee2e6;
+            border-right: 1px solid #444;
         }
 
         .main-area {
             flex: 1;
             display: flex;
             flex-direction: column;
+            background: #1e1e2e;
         }
 
         .conversation {
@@ -68,12 +71,13 @@
             padding: 25px;
             overflow-y: auto;
             max-height: 500px;
+            background: #1e1e2e;
         }
 
         .input-area {
             padding: 25px;
-            border-top: 1px solid #dee2e6;
-            background: #f8f9fa;
+            border-top: 1px solid #444;
+            background: #2a2a3e;
         }
 
         .form-group {
@@ -84,7 +88,7 @@
             display: block;
             margin-bottom: 8px;
             font-weight: 600;
-            color: #333;
+            color: #e0e0e0;
         }
 
         .form-group select,
@@ -92,10 +96,12 @@
         .form-group textarea {
             width: 100%;
             padding: 12px;
-            border: 2px solid #dee2e6;
+            border: 2px solid #444;
             border-radius: 8px;
             font-size: 14px;
             transition: all 0.3s ease;
+            background: #1a1a2e;
+            color: #e0e0e0;
         }
 
         .form-group select:focus,
@@ -120,15 +126,34 @@
         }
 
         .message.user {
-            background: linear-gradient(135deg, #667eea, #764ba2);
-            color: white;
+            background: linear-gradient(135deg, #4a5568, #2d3748);
+            color: #e0e0e0;
             margin-left: 50px;
         }
 
         .message.assistant {
-            background: linear-gradient(135deg, #f093fb, #f5576c);
-            color: white;
+            background: linear-gradient(135deg, #2a4365, #1a202c);
+            color: #e0e0e0;
             margin-right: 50px;
+            border: 1px solid #555;
+        }
+
+        .message.assistant.streaming {
+            border-left: 4px solid #667eea;
+            background: linear-gradient(135deg, #2a4365, #1a202c);
+            position: relative;
+        }
+
+        .message.assistant.streaming::after {
+            content: '▌';
+            color: #667eea;
+            animation: blink 1s infinite;
+            margin-left: 2px;
+        }
+
+        @keyframes blink {
+            0%, 50% { opacity: 1; }
+            51%, 100% { opacity: 0; }
         }
 
         .message-header {
@@ -190,7 +215,7 @@
             display: none;
             text-align: center;
             padding: 20px;
-            color: #666;
+            color: #ccc;
         }
 
         .loading.show {
@@ -198,7 +223,7 @@
         }
 
         .spinner {
-            border: 3px solid #f3f3f3;
+            border: 3px solid #444;
             border-top: 3px solid #667eea;
             border-radius: 50%;
             width: 30px;
@@ -210,12 +235,12 @@
         .empty-state {
             text-align: center;
             padding: 60px 20px;
-            color: #666;
+            color: #ccc;
         }
 
         .empty-state h3 {
             margin-bottom: 10px;
-            color: #333;
+            color: #e0e0e0;
         }
 
         @keyframes fadeIn {
@@ -265,11 +290,11 @@
                 <div class="form-group">
                     <label for="poetryType">Poetry Type:</label>
                     <select id="poetryType">
-                        <option value="thơ bốn chữ">thơ bón chữ</option>
-                        <option value="thơ bảy chữ" selected>thơ bảy chữ</option>
-                        <option value="thơ lục bát">thơ lục bát</option>
-                        <option value="thơ tám chữ">thơ tám chữ</option>
-                        <option value="thơ năm chữ">thơ năm chữ</option>
+                        <option value="thơ bốn chữ">Thơ bốn chữ</option>
+                        <option value="thơ bảy chữ" selected>Thơ bảy chữ</option>
+                        <option value="thơ lục bát">Thơ lục bát</option>
+                        <option value="thơ tám chữ">Thơ tám chữ</option>
+                        <option value="thơ năm chữ">Thơ năm chữ</option>
                     </select>
                 </div>
 
@@ -328,6 +353,7 @@
         
         // Conversation history
         let conversationHistory = [];
+        let isGenerating = false;
 
         // DOM elements
         const conversation = document.getElementById('conversation');
@@ -337,10 +363,16 @@
 
         // Initialize
         document.addEventListener('DOMContentLoaded', function() {
-            // Remove the duplicate event listener here
+            promptInput.addEventListener('keydown', function(e) {
+                if (e.key === 'Enter' && e.ctrlKey) {
+                    generatePoem();
+                }
+            });
         });
 
         async function generatePoem() {
+            if (isGenerating) return;
+            
             const prompt = promptInput.value.trim();
             if (!prompt) {
                 alert('Please enter a prompt!');
@@ -354,7 +386,7 @@
             const topP = parseFloat(document.getElementById('topP').value);
 
             // Add poetry type prefix to prompt
-            const fullPrompt = `${poetryType} :${prompt}`;
+            const fullPrompt = `${poetryType}: ${prompt}`;
 
             // Add user message to conversation
             addMessage('user', prompt, poetryType);
@@ -362,11 +394,18 @@
             // Clear input
             promptInput.value = '';
             
-            // Show loading
-            showLoading(true);
+            // Disable generation
+            isGenerating = true;
+            generateBtn.disabled = true;
+            generateBtn.textContent = 'Generating...';
             
             try {
-                const response = await fetch(`${API_BASE_URL}/generate`, {
+                // Create assistant message for streaming
+                const assistantMessage = addMessage('assistant', prompt + ' ', null, true);
+                let fullResponse = prompt + ' ';
+                
+                // Make streaming request
+                const response = await fetch(`${API_BASE_URL}/generate/stream`, {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',
@@ -384,20 +423,61 @@
                     throw new Error(`HTTP error! status: ${response.status}`);
                 }
 
-                const data = await response.json();
+                // Read streaming response
+                const reader = response.body.getReader();
+                const decoder = new TextDecoder();
                 
-                // Add assistant response to conversation
-                addMessage('assistant', data.generated_text);
+                while (true) {
+                    const { done, value } = await reader.read();
+                    if (done) break;
+                    
+                    const chunk = decoder.decode(value);
+                    const lines = chunk.split('\n');
+                    
+                    for (const line of lines) {
+                        if (line.startsWith('data: ')) {
+                            try {
+                                const data = JSON.parse(line.slice(6));
+                                console.log('Received SSE data:', data); // Debug log
+                                
+                                if (data.type === 'content') {
+                                    fullResponse += data.chunk;
+                                    assistantMessage.querySelector('.message-content').textContent = fullResponse;
+                                    conversation.scrollTop = conversation.scrollHeight;
+                                } else if (data.type === 'done') {
+                                    // Remove streaming class and cursor
+                                    assistantMessage.classList.remove('streaming');
+                                    console.log('Streaming completed'); // Debug log
+                                    break;
+                                } else if (data.type === 'error') {
+                                    throw new Error(data.chunk);
+                                }
+                            } catch (e) {
+                                console.error('Error parsing SSE data:', e);
+                            }
+                        }
+                    }
+                }
+                
+                // Add to conversation history
+                conversationHistory.push({ 
+                    role: 'assistant', 
+                    content: fullResponse, 
+                    poetryType: null 
+                });
                 
             } catch (error) {
                 console.error('Error:', error);
                 addMessage('assistant', 'Sorry, there was an error generating the poem. Please check if the API server is running and try again.');
             } finally {
-                showLoading(false);
+                // Re-enable generation
+                isGenerating = false;
+                generateBtn.disabled = false;
+                generateBtn.textContent = '✨ Generate Poem';
             }
         }
 
-        function addMessage(role, content, poetryType = null) {
+        function addMessage(role, content, poetryType = null, isStreaming = false) {
             // Remove empty state if it exists
             const emptyState = conversation.querySelector('.empty-state');
             if (emptyState) {
@@ -406,6 +486,10 @@
 
             const messageDiv = document.createElement('div');
             messageDiv.className = `message ${role}`;
+            
+            if (isStreaming) {
+                messageDiv.classList.add('streaming');
+            }
             
             const headerDiv = document.createElement('div');
             headerDiv.className = 'message-header';
@@ -425,23 +509,17 @@
             
             conversation.appendChild(messageDiv);
             
-            // Add to history
-            conversationHistory.push({ role, content, poetryType });
+            // Add to history (only for non-streaming messages)
+            if (!isStreaming) {
+                conversationHistory.push({ role, content, poetryType });
+            }
             
             // Scroll to bottom
             conversation.scrollTop = conversation.scrollHeight;
+            
+            return messageDiv;
         }
 
-        function showLoading(show) {
-            loading.classList.toggle('show', show);
-            generateBtn.disabled = show;
-            
-            if (show) {
-                generateBtn.textContent = 'Generating...';
-            } else {
-                generateBtn.textContent = '✨ Generate Poem';
-            }
-        }
 
         function clearConversation() {
             if (conversationHistory.length === 0) return;
@@ -457,11 +535,10 @@
             }
         }
 
-        // Handle Enter key in prompt - single event listener
+        // Handle Enter key in prompt
         document.getElementById('prompt').addEventListener('keydown', function(e) {
             if (e.key === 'Enter' && !e.shiftKey) {
                 e.preventDefault();
-                e.stopPropagation();
                 generatePoem();
             }
         });
