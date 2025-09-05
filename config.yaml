@@ -3,7 +3,7 @@
 # Data configuration
 data:
   data_folder: "./data1"
-  tokenizer_file: "checkpoints/vietnamese_tokenizer.json"
+  tokenizer_file: "D:/2025/src/npl_vietnamese/nlp_vietnamese/checkpointsvietnamese_tokenizer.json"
   vocab_size: 25000
   max_seq_len: 512
   train_split: 0.8
@@ -34,5 +34,5 @@ generation:
 
 # Save configuration
 save:
-  model_save_path: "checkpoints/model/vietnamese_checkpoint.pt"
+  model_save_path: "D:/2025/src/npl_vietnamese/nlp_vietnamese/checkpoints/modelvietnamese_checkpoint.pt"
   config_save_path: "training_config.json"
